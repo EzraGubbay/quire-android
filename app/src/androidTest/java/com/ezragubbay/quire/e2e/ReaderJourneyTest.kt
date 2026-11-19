@@ -177,7 +177,7 @@ class ReaderJourneyTest {
 
         // ...reopen the same file: the last-read page (persisted in Room) is restored.
         enqueuePdf() // reopening may re-stream to the cache
-        openLectureFile()
+        reopenLectureFile()
         awaitTag("pdf-page-3")
         composeRule.onNodeWithTag("pdf-page-3").assertIsDisplayed()
     }
@@ -227,7 +227,7 @@ class ReaderJourneyTest {
 
         // With the file downloaded the server can vanish; reopening still renders from disk.
         server.server.shutdown()
-        openLectureFile()
+        reopenLectureFile()
         awaitTag("pdf-page-1")
         composeRule.onNodeWithTag("pdf-page-1").assertIsDisplayed()
     }
@@ -260,6 +260,7 @@ class ReaderJourneyTest {
         pressBack()
 
         // The Downloads tab lists the downloaded file (with size) and shows total storage used.
+        pressBack() // course screen -> courses list, where the bottom bar lives
         composeRule.onNodeWithTag("nav-downloads").performClick()
         composeRule.onNodeWithTag("screen-downloads").assertIsDisplayed()
         awaitTag("download-row-$LECTURE_FILE_ID")
@@ -278,6 +279,7 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("viewer-download-toggle").performClick()
         awaitTag("download-state-done")
         pressBack()
+        pressBack() // course screen -> courses list, where the bottom bar lives
         composeRule.onNodeWithTag("nav-downloads").performClick()
         awaitTag("download-row-$LECTURE_FILE_ID")
 
@@ -301,6 +303,7 @@ class ReaderJourneyTest {
         pressBack()
 
         // A failed download surfaces a failed state with a retry; retrying re-enqueues the work.
+        pressBack() // course screen -> courses list, where the bottom bar lives
         composeRule.onNodeWithTag("nav-downloads").performClick()
         awaitTag("download-row-$LECTURE_FILE_ID")
         composeRule.onNodeWithTag("download-state-failed").assertIsDisplayed()
@@ -435,6 +438,13 @@ class ReaderJourneyTest {
     /** Opens the course's Files tab and taps the lecture deck row to drive the open-file flow. */
     private fun openLectureFile() {
         openFilesTab()
+        composeRule.onNodeWithTag("file-row-$LECTURE_FILE_ID").performClick()
+    }
+
+    /** After backing out of the viewer we are still on the course screen: re-select Files and tap the row. */
+    private fun reopenLectureFile() {
+        composeRule.onNodeWithTag("tab-files").performClick()
+        awaitTag("file-list")
         composeRule.onNodeWithTag("file-row-$LECTURE_FILE_ID").performClick()
     }
 
