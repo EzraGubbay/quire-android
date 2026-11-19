@@ -47,16 +47,15 @@ object SessionModule {
     ): SessionRepository = SessionRepository(context.sessionDataStore, KeystoreCipher(), scope)
 
     /**
-     * Suspend-to-sync bridge: the network layer's [TokenProvider] is synchronous but [SessionRepository.token]
-     * suspends. It runs on OkHttp's IO threads (never main), and the singleton `TokenCache` in front of it means
-     * only the first request after launch/sign-in blocks. A token minted by an in-flight pairing wins.
+     * The network layer's [TokenProvider] is synchronous and runs on OkHttp's network threads, so it must never
+     * block: it serves the repository's warm in-memory token. A token minted by an in-flight pairing wins.
      */
     @Provides
     @Singleton
     fun tokenProvider(
         sessions: SessionRepository,
         pending: PendingPairing,
-    ): TokenProvider = TokenProvider { pending.token ?: runBlocking { sessions.token() } }
+    ): TokenProvider = TokenProvider { pending.token ?: sessions.tokenOrNull() }
 
     /**
      * Read per request, synchronously, from the session state. [SessionRepository.state] starts as signed-out

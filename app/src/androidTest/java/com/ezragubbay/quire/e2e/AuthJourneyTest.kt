@@ -5,10 +5,13 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -137,7 +140,8 @@ class AuthJourneyTest {
         launch()
         pair()
 
-        composeRule.onNodeWithTag("pair-error").assertIsDisplayed()
+        // The error renders below the form, which scrolls under the soft keyboard: bring it into view.
+        composeRule.onNodeWithTag("pair-error").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("screen-pair").assertIsDisplayed()
         composeRule.onNodeWithTag("app-root").assertDoesNotExist()
     }
@@ -171,8 +175,14 @@ class AuthJourneyTest {
         composeRule.onNodeWithTag("action-settings").performClick()
         composeRule.onNodeWithTag("settings-account").assertIsDisplayed()
         server.server.enqueue(MockResponse().setResponseCode(204))
-        composeRule.onNodeWithTag("action-sign-out").performClick()
+        // Settings scrolls and Sign out sits below the fold on the CI emulator: scroll it into view or the
+        // click lands off-screen and is a silent no-op.
+        composeRule.onNodeWithTag("action-sign-out").performScrollTo().performClick()
 
+        // Sign-out is async (revoke token → clear session → flip state → navigate): wait for Pair.
+        composeRule.waitUntil(PAIR_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag("screen-pair").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("screen-pair").assertIsDisplayed()
 
         // Token cleared: a relaunch returns to Pair, not Courses.
@@ -197,6 +207,11 @@ class AuthJourneyTest {
         composeRule.waitForIdle()
 
         // A 401 clears the session and routes back to Pair with a "signed out — pair again" message.
+        // The 401 round-trip resolves asynchronously (waitForIdle doesn't track the in-flight call),
+        // so wait for the routed-back error before asserting.
+        composeRule.waitUntil(PAIR_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag("pair-error").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("screen-pair").assertIsDisplayed()
         composeRule.onNodeWithTag("pair-error").assertIsDisplayed()
     }
@@ -227,7 +242,15 @@ class AuthJourneyTest {
     private fun pair() {
         composeRule.onNodeWithTag("field-server-url").performTextReplacement(server.baseUrl)
         composeRule.onNodeWithTag("field-pair-code").performTextReplacement("AbC12345")
-        composeRule.onNodeWithTag("action-pair").performClick()
+        // The Pair button is disabled until the form validates (canPair). The state that drives it is
+        // collected via collectAsStateWithLifecycle, so on a slow emulator it recomposes a beat after the
+        // text edits — clicking immediately lands on a still-disabled button, a silent no-op that strands
+        // the journey on Pair until waitUntil times out (the API-34 CI flake). Wait for the enabled button,
+        // then scroll it into view (the form scrolls under the soft keyboard) before clicking.
+        composeRule.waitUntil(PAIR_TIMEOUT_MS) {
+            composeRule.onAllNodes(hasTestTag("action-pair") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("action-pair").performScrollTo().performClick()
         // Pairing is async (pair -> me -> store): wait for it to leave Pair or fail inline.
         composeRule.waitUntil(PAIR_TIMEOUT_MS) {
             composeRule.onAllNodesWithTag("screen-pair").fetchSemanticsNodes().isEmpty() ||
