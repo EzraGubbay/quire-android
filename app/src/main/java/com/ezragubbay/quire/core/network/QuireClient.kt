@@ -58,22 +58,24 @@ suspend fun <T> apiCall(
         ApiResult.Failure.Unknown(message = e.message.orEmpty())
     }
 
-private fun <T> Response<T>.toApiResult(requireBody: Boolean): ApiResult<T> {
-    if (isSuccessful) {
-        if (requireBody && body() == null) return ApiResult.Failure.Unknown(code(), "Empty response body")
-        @Suppress("UNCHECKED_CAST")
-        return ApiResult.Success((body() ?: Unit) as T)
-    }
-    val envelope =
-        try {
-            errorBody()?.string()?.let { QuireJson.decodeFromString<ErrorEnvelope>(it).error }
-        } catch (_: SerializationException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
+private fun <T> Response<T>.toApiResult(requireBody: Boolean): ApiResult<T> =
+    when {
+        !isSuccessful -> mapError(code(), errorEnvelope())
+        requireBody && body() == null -> ApiResult.Failure.Unknown(code(), "Empty response body")
+        else -> {
+            @Suppress("UNCHECKED_CAST")
+            ApiResult.Success((body() ?: Unit) as T)
         }
-    return mapError(code(), envelope)
-}
+    }
+
+private fun <T> Response<T>.errorEnvelope(): ErrorBody? =
+    try {
+        errorBody()?.string()?.let { QuireJson.decodeFromString<ErrorEnvelope>(it).error }
+    } catch (_: SerializationException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 
 private const val HTTP_BAD_REQUEST = 400
 private const val HTTP_UNAUTHORIZED = 401
