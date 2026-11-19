@@ -59,6 +59,32 @@ class SessionRepositoryTest {
         }
 
     @Test
+    fun tokenOrNull_isNullImmediately_whenSignedOut() {
+        val repo = repo()
+        assertNull(repo.tokenOrNull())
+    }
+
+    @Test
+    fun tokenOrNull_isWarmAfterSignIn_andClearedOnSignOut() =
+        runBlocking {
+            val repo = repo()
+            repo.signInDefault()
+            assertEquals(TOKEN, repo.tokenOrNull())
+            repo.signOut()
+            assertNull(repo.tokenOrNull())
+        }
+
+    @Test
+    fun tokenOrNull_isRestoredByEagerCollection_withoutBlockingRead() =
+        runBlocking {
+            val dataStore = store()
+            repo(dataStore).signInDefault()
+            val restored = repo(dataStore)
+            restored.state.first { it is SessionState.SignedIn }
+            assertEquals(TOKEN, restored.tokenOrNull())
+        }
+
+    @Test
     fun signOut_clearsSessionAndToken() =
         runBlocking {
             val repo = repo()

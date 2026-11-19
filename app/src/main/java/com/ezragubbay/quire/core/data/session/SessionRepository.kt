@@ -35,18 +35,34 @@ class SessionRepository(
     private val cipher: SecretCipher,
     scope: CoroutineScope,
 ) {
+    /**
+     * In-memory copy of the device token, kept current by the eager [state] collection, [signIn] and [signOut].
+     * Private on purpose: it never leaves this class except through [tokenOrNull], and it is never persisted.
+     */
+    @Volatile
+    private var cachedToken: String? = null
+
     /** Current identity. [SessionState.SignedOut] until the first disk read; use [current] to await it. */
     val state: StateFlow<SessionState> =
         dataStore.data
             .catch { emit(emptyPreferences()) }
-            .map { prefs -> decode(prefs)?.toState() ?: SessionState.SignedOut }
-            .stateIn(scope, SharingStarted.Eagerly, SessionState.SignedOut)
+            .map { prefs ->
+                val session = decode(prefs)
+                cachedToken = session?.token
+                session?.toState() ?: SessionState.SignedOut
+            }.stateIn(scope, SharingStarted.Eagerly, SessionState.SignedOut)
 
     /** Reads the persisted session from disk (authoritative; suspends until restored). */
     suspend fun current(): SessionState = read()?.toState() ?: SessionState.SignedOut
 
     /** The decrypted device token, or null when signed out. */
     suspend fun token(): String? = read()?.token
+
+    /**
+     * The warm in-memory token, or null when signed out or before the first disk read lands. Never blocks and
+     * never touches DataStore, so it is safe on OkHttp's network threads for unauthenticated calls such as pairing.
+     */
+    fun tokenOrNull(): String? = cachedToken
 
     suspend fun signIn(
         serverUrl: String,
@@ -57,9 +73,11 @@ class SessionRepository(
         val payload = Json.encodeToString(StoredSession(serverUrl, token, login, deviceName)).toByteArray()
         val blob = Base64.getEncoder().encodeToString(cipher.encrypt(payload))
         dataStore.edit { it[BLOB] = blob }
+        cachedToken = token
     }
 
     suspend fun signOut() {
+        cachedToken = null
         dataStore.edit { it.remove(BLOB) }
     }
 
