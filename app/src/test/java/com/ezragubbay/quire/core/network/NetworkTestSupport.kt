@@ -11,14 +11,19 @@ fun fixture(name: String): String =
 fun fixtureResponse(
     name: String,
     code: Int = 200,
-): MockResponse = MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(fixture(name))
+): MockResponse =
+    MockResponse().setResponseCode(code).setHeader("Content-Type", "application/json").setBody(fixture(name))
 
 private object NetworkTestSupport
 
-class FakeTokenProvider(var value: String? = null) : TokenProvider {
+class FakeTokenProvider(
+    var value: String? = null,
+) : TokenProvider {
     override fun token(): String? = value
 }
 
-class FakeServerConfig(var url: String? = null) : ServerConfigProvider {
+class FakeServerConfig(
+    var url: String? = null,
+) : ServerConfigProvider {
     override fun serverUrl(): String? = url
 }

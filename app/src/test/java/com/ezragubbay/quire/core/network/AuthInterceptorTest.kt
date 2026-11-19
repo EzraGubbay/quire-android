@@ -1,6 +1,9 @@
 package com.ezragubbay.quire.core.network
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -20,7 +23,7 @@ class AuthInterceptorTest {
     fun setUp() {
         server = MockWebServer().also { it.start() }
         config.url = server.url("/").toString()
-        client = QuireClientFactory.create(config, tokens, events, allowCleartextLocal = true)
+        client = QuireClientFactory.create(config, tokens, events, NetworkOptions(allowCleartextLocal = true))
     }
 
     @After
@@ -92,30 +95,35 @@ class AuthInterceptorTest {
         assertTrue(!ServerUrl.isAllowed("not a url", allowCleartextLocal = true))
     }
 
-    @Test
-    fun unauthorizedOnAuthenticatedCallEmitsSessionExpired() =
+    private fun expiredAfter(block: suspend () -> Unit): Int =
         runBlocking {
-            tokens.value = "t"
-            server.enqueue(fixtureResponse("error.unauthorized.json", code = 401))
-            val result = client.me()
-            assertTrue(result is ApiResult.Failure.Unauthorized)
-            assertTrue(events.consumeExpired())
+            val seen = mutableListOf<SessionExpired>()
+            val job = launch(start = CoroutineStart.UNDISPATCHED) { events.expired.collect { seen += it } }
+            block()
+            yield()
+            job.cancel()
+            seen.size
         }
 
     @Test
-    fun unauthorizedWithoutSessionDoesNotEmitSessionExpired() =
-        runBlocking {
-            server.enqueue(fixtureResponse("error.unauthorized.json", code = 401))
-            client.pair("x", "y")
-            assertTrue(!events.consumeExpired())
-        }
+    fun unauthorizedOnAuthenticatedCallEmitsSessionExpired() {
+        tokens.value = "t"
+        server.enqueue(fixtureResponse("error.unauthorized.json", code = 401))
+        var result: ApiResult<*>? = null
+        assertEquals(1, expiredAfter { result = client.me() })
+        assertTrue(result is ApiResult.Failure.Unauthorized)
+    }
 
     @Test
-    fun successDoesNotEmitSessionExpired() =
-        runBlocking {
-            tokens.value = "t"
-            server.enqueue(fixtureResponse("getMe.200.json"))
-            client.me()
-            assertTrue(!events.consumeExpired())
-        }
+    fun unauthorizedWithoutSessionDoesNotEmitSessionExpired() {
+        server.enqueue(fixtureResponse("error.unauthorized.json", code = 401))
+        assertEquals(0, expiredAfter { client.pair("x", "y") })
+    }
+
+    @Test
+    fun successDoesNotEmitSessionExpired() {
+        tokens.value = "t"
+        server.enqueue(fixtureResponse("getMe.200.json"))
+        assertEquals(0, expiredAfter { client.me() })
+    }
 }

@@ -20,7 +20,7 @@ class ApiResultMappingTest {
     fun setUp() {
         server = MockWebServer().also { it.start() }
         config.url = server.url("/").toString()
-        client = QuireClientFactory.create(config, tokens, SessionEvents(), allowCleartextLocal = true)
+        client = QuireClientFactory.create(config, tokens, SessionEvents(), NetworkOptions(allowCleartextLocal = true))
     }
 
     @After
@@ -67,7 +67,10 @@ class ApiResultMappingTest {
 
     @Test
     fun unauthorized() {
-        assertEquals("Missing or invalid bearer token", assertMaps<ApiResult.Failure.Unauthorized>("error.unauthorized.json", 401).message)
+        assertEquals(
+            "Missing or invalid bearer token",
+            assertMaps<ApiResult.Failure.Unauthorized>("error.unauthorized.json", 401).message,
+        )
     }
 
     @Test
@@ -77,7 +80,10 @@ class ApiResultMappingTest {
 
     @Test
     fun invalidRequest() {
-        assertEquals("code: Invalid pairing code", assertMaps<ApiResult.Failure.InvalidRequest>("error.invalid_request.json", 400).message)
+        assertEquals(
+            "code: Invalid pairing code",
+            assertMaps<ApiResult.Failure.InvalidRequest>("error.invalid_request.json", 400).message,
+        )
     }
 
     @Test
@@ -132,7 +138,13 @@ class ApiResultMappingTest {
 
     @Test
     fun timeoutIsNetwork() {
-        val fast = QuireClientFactory.create(config, tokens, SessionEvents(), allowCleartextLocal = true, timeoutMillis = 200)
+        val fast =
+            QuireClientFactory.create(
+                config,
+                tokens,
+                SessionEvents(),
+                NetworkOptions(allowCleartextLocal = true, timeoutMillis = 200),
+            )
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
         assertTrue(runBlocking { fast.me() } is ApiResult.Failure.Network)
     }
