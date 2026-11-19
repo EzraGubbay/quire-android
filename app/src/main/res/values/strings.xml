@@ -24,5 +24,18 @@
     <string name="pair_error_rate_limited">Too many attempts. Wait a minute and try again.</string>
     <string name="pair_error_unreachable">Can\'t reach the server. Check the address and your connection.</string>
     <string name="pair_error_server">The server had a problem. Try again shortly.</string>
+    <string name="pair_scan_qr">Scan QR code</string>
+    <string name="pair_replace_title">Replace current session?</string>
+    <string name="pair_replace_body">You are already signed in. Pairing again replaces this device\'s session.</string>
+    <string name="pair_replace_confirm">Replace</string>
+    <string name="pair_replace_cancel">Cancel</string>
+    <string name="scan_title">Scan pairing code</string>
+    <string name="scan_hint">Point the camera at the QR code in Quire on the web (Settings, Mobile devices).</string>
+    <string name="scan_not_quire">Not a Quire pairing code</string>
+    <string name="scan_rationale">Quire uses the camera only to read the pairing QR code. Nothing is recorded or stored.</string>
+    <string name="scan_grant">Allow camera</string>
+    <string name="scan_denied">Camera access is off. Allow it in system settings to scan, or go back and type the code instead.</string>
+    <string name="scan_open_settings">Open settings</string>
+    <string name="scan_back">Back</string>
     <string name="pair_error_not_quire">That address doesn\'t look like a Quire server.</string>
 </resources>

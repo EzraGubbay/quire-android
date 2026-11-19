@@ -44,6 +44,29 @@ class PairViewModel
         /** Fires once after a successful pairing (the session is already stored). */
         val paired: Flow<Unit> = _paired.receiveAsFlow()
 
+        private val _submitRequests = Channel<Unit>(Channel.BUFFERED)
+
+        /** Fires after a QR scan prefilled the form: the screen should submit (after any session-replace confirm). */
+        val submitRequests: Flow<Unit> = _submitRequests.receiveAsFlow()
+
+        /** Prefills server and code (deep link or QR) without submitting. */
+        fun prefill(
+            serverUrl: String,
+            code: String,
+        ) {
+            onServerUrlChange(serverUrl)
+            onCodeChange(code)
+        }
+
+        /** A scanned QR prefills the form and asks the screen to submit it. */
+        fun onScanned(
+            serverUrl: String,
+            code: String,
+        ) {
+            prefill(serverUrl, code)
+            _submitRequests.trySend(Unit)
+        }
+
         fun onServerUrlChange(value: String) = _state.update { it.copy(serverUrl = value, error = null) }
 
         /** Uppercases and keeps only letters/digits (paste-friendly: spaces and dashes are dropped), max 8. */
