@@ -8,7 +8,7 @@ import com.ezragubbay.quire.core.network.TokenCache
 import javax.inject.Inject
 
 /** Why a pairing attempt failed; the screen maps each to a specific inline message. */
-enum class PairError { InvalidUrl, InvalidCode, RateLimited, Unreachable, ServerError, NotQuireServer }
+enum class PairError { InvalidUrl, InvalidCode, RateLimited, Unreachable, ServerError, NotQuireServer, SessionExpired }
 
 sealed interface PairResult {
     data object Success : PairResult

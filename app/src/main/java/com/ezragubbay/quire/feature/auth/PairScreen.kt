@@ -147,4 +147,5 @@ private fun PairError.messageRes(): Int =
         PairError.Unreachable -> R.string.pair_error_unreachable
         PairError.ServerError -> R.string.pair_error_server
         PairError.NotQuireServer -> R.string.pair_error_not_quire
+        PairError.SessionExpired -> R.string.pair_error_session_expired
     }

@@ -162,9 +162,9 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S5 (#28)
     @Test
-    @Ignore("QMOB-E3")
     fun signOut_fromSettings_returnsToPair_andClearsToken() {
         server.enqueueFixture("pair-success.json")
+        server.enqueueFixture("me.json")
         launch()
         pair()
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
@@ -186,9 +186,9 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S5 (#28)
     @Test
-    @Ignore("QMOB-E3")
     fun expiredSession_onRelaunch_returnsToPairWithMessage() {
         server.enqueueFixture("pair-success.json")
+        server.enqueueFixture("me.json")
         launch()
         pair()
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()

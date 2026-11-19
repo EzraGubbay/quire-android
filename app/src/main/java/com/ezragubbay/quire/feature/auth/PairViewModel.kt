@@ -44,6 +44,9 @@ class PairViewModel
         /** Fires once after a successful pairing (the session is already stored). */
         val paired: Flow<Unit> = _paired.receiveAsFlow()
 
+        /** Explains why the user is back here: the stored session was revoked or expired. */
+        fun onSessionExpired() = _state.update { it.copy(error = PairError.SessionExpired, loading = false) }
+
         fun onServerUrlChange(value: String) = _state.update { it.copy(serverUrl = value, error = null) }
 
         /** Uppercases and keeps only letters/digits (paste-friendly: spaces and dashes are dropped), max 8. */
