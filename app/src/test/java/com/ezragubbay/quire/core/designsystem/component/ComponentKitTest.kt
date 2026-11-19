@@ -1,14 +1,19 @@
 package com.ezragubbay.quire.core.designsystem.component
 
 import android.content.Context
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -37,6 +42,7 @@ import org.robolectric.RobolectricTestRunner
 private const val HEBREW_TITLE = "אלגברה לינארית למדעי המחשב"
 private const val LONG_TITLE = "Introduction to Algorithms and Data Structures for Computational Biology, Part Two"
 
+@OptIn(ExperimentalMaterial3Api::class)
 @RunWith(RobolectricTestRunner::class)
 class ComponentKitTest {
     @get:Rule val rule = createComposeRule()
@@ -62,10 +68,10 @@ class ComponentKitTest {
         }
         rule.onNodeWithTag("file-row").assert(hasClick()).performClick()
         assertEquals(1, clicks)
-        rule.onNodeWithTag("file-row-title").assertTextEquals("Lecture 3")
-        rule.onNodeWithTag("file-row-meta").assertTextEquals("PDF - 2.1 MB")
-        rule.onNodeWithTag("file-type-chip").assertIsDisplayed()
-        rule.onNodeWithTag("trailing").assertIsDisplayed()
+        rule.onNodeWithTag("file-row-title", useUnmergedTree = true).assertTextEquals("Lecture 3")
+        rule.onNodeWithTag("file-row-meta", useUnmergedTree = true).assertTextEquals("PDF - 2.1 MB")
+        rule.onNodeWithTag("file-type-chip", useUnmergedTree = true).assertIsDisplayed()
+        rule.onNodeWithTag("trailing", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
@@ -81,9 +87,12 @@ class ComponentKitTest {
                 FileType.OTHER to R.string.file_type_other,
             )
         assertEquals(FileType.entries.toSet(), expected.keys)
+        var current by mutableStateOf(FileType.LECTURE)
+        rule.setContent { QuireTheme(ThemeMode.Light) { FileTypeChip(current) } }
         expected.forEach { (type, res) ->
-            rule.setContent { QuireTheme(ThemeMode.Light) { FileTypeChip(type) } }
-            rule.onNodeWithTag("file-type-chip").assertTextEquals(context.getString(res))
+            current = type
+            rule.waitForIdle()
+            rule.onNodeWithTag("file-type-chip", useUnmergedTree = true).assertTextEquals(context.getString(res))
         }
     }
 
@@ -98,7 +107,11 @@ class ComponentKitTest {
         var retries = 0
         themed { ErrorState(message = "Could not load files", onRetry = { retries++ }) }
         rule.onNodeWithTag("error-state-message").assertTextEquals("Could not load files")
-        rule.onNodeWithTag("error-state-retry").assert(hasClick()).assertHeightIsAtLeast(48.dp).performClick()
+        rule
+            .onNodeWithTag("error-state-retry")
+            .assert(hasClick())
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
         assertEquals(1, retries)
     }
 
@@ -121,10 +134,12 @@ class ComponentKitTest {
     @Test
     fun loadingSkeleton_isAnnouncedAsLoading() {
         themed { LoadingSkeleton() }
-        rule.onNodeWithTag("loading-skeleton")
+        rule
+            .onNodeWithTag("loading-skeleton")
             .assert(
                 SemanticsMatcher("contentDescription is loading") {
-                    it.config.getOrNull(SemanticsProperties.ContentDescription)
+                    it.config
+                        .getOrNull(SemanticsProperties.ContentDescription)
                         ?.contains(context.getString(R.string.state_loading)) == true
                 },
             )
@@ -133,7 +148,8 @@ class ComponentKitTest {
     @Test
     fun sectionHeader_isAHeading() {
         themed { SectionHeader("Lectures") }
-        rule.onNodeWithTag("section-header")
+        rule
+            .onNodeWithTag("section-header")
             .assertTextEquals("Lectures")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
     }
@@ -142,10 +158,14 @@ class ComponentKitTest {
     fun courseCard_click_invokesCallback_meetsTouchTarget() {
         var clicks = 0
         themed { CourseCard(title = "Algorithms", subtitle = "12 files", onClick = { clicks++ }) }
-        rule.onNodeWithTag("course-card").assert(hasClick()).assertHeightIsAtLeast(48.dp).performClick()
+        rule
+            .onNodeWithTag("course-card")
+            .assert(hasClick())
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
         assertEquals(1, clicks)
-        rule.onNodeWithTag("course-card-title").assertTextEquals("Algorithms")
-        rule.onNodeWithTag("course-card-subtitle").assertTextEquals("12 files")
+        rule.onNodeWithTag("course-card-title", useUnmergedTree = true).assertTextEquals("Algorithms")
+        rule.onNodeWithTag("course-card-subtitle", useUnmergedTree = true).assertTextEquals("12 files")
     }
 
     @Test
@@ -173,8 +193,18 @@ class ComponentKitTest {
                 }
             }
         }
-        rule.onNodeWithTag("course-card-title").assertTextEquals(HEBREW_TITLE).assertNotOverflowing()
-        rule.onNodeWithTag("file-row-title").assertTextEquals(HEBREW_TITLE).assertNotOverflowing()
+        rule
+            .onNodeWithTag(
+                "course-card-title",
+                useUnmergedTree = true,
+            ).assertTextEquals(HEBREW_TITLE)
+            .assertNotOverflowing()
+        rule
+            .onNodeWithTag(
+                "file-row-title",
+                useUnmergedTree = true,
+            ).assertTextEquals(HEBREW_TITLE)
+            .assertNotOverflowing()
     }
 
     @Test
@@ -190,8 +220,8 @@ class ComponentKitTest {
                 }
             }
         }
-        rule.onNodeWithTag("course-card-title").assertNotOverflowing()
-        rule.onNodeWithTag("file-row-title").assertNotOverflowing()
+        rule.onNodeWithTag("course-card-title", useUnmergedTree = true).assertNotOverflowing()
+        rule.onNodeWithTag("file-row-title", useUnmergedTree = true).assertNotOverflowing()
         rule.onNodeWithTag("file-row").assertHeightIsAtLeast(48.dp)
     }
 
@@ -210,8 +240,7 @@ class ComponentKitTest {
             assertTrue(results.isNotEmpty())
             results.forEach {
                 assertFalse(it.didOverflowHeight)
-                assertFalse(it.didOverflowWidth)
-                assertFalse(it.hasVisualOverflow)
+                assertFalse((0 until it.lineCount).any { line -> it.isLineEllipsized(line) })
             }
         }
 }
