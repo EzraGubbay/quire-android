@@ -11,6 +11,21 @@
 Most logic belongs in unit tests; instrumented tests cover UI journeys end to end against fake servers. Tests are
 written first (see `AGENTS.md`).
 
+## Screenshot tests (Roborazzi)
+
+`DesignSystemScreenshotTest` scans every `@Preview` under `core/designsystem` (the component kit through
+`@QuirePreviews`: light, dark, RTL (`he`), large font; plus the palette and type specimens in light and dark) with
+ComposablePreviewScanner and compares each render with a golden in `app/src/test/screenshots/`.
+
+- Verify: `./gradlew verifyRoborazziDebug` fails on a visual diff (diff images land in `app/build/outputs/roborazzi/`).
+  `gradle.properties` sets `roborazzi.test.verify=true`, so plain `./gradlew testDebugUnitTest` (the CI `unit-tests`
+  job) verifies too, with no workflow change.
+- Record / regenerate: `./gradlew recordRoborazziDebug`, then review and commit the changed PNGs. Do this only for an
+  intentional visual change.
+- Determinism: fixed device qualifiers (`w411dp-h891dp-xxhdpi`), `sdk=35`, bundled fonts, native graphics mode, and a
+  1% diff tolerance so goldens recorded on macOS pass on Linux CI.
+- A new `@Preview` in `core/designsystem` is picked up automatically; record its golden in the same PR.
+
 ## Naming
 
 - Classes: `<Subject>Test` (e.g. `MainActivitySmokeTest`, `MockWebServerRuleTest`).
