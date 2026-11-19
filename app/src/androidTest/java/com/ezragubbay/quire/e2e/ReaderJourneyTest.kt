@@ -15,17 +15,21 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
+import com.ezragubbay.quire.core.download.DownloadRepository
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import javax.inject.Inject
 
 /**
  * Epic e2e journey for QMOB-E5 (reader: downloads, PDF viewer, open-file, downloads library, share,
@@ -81,7 +85,21 @@ class ReaderJourneyTest {
     @get:Rule(order = 3)
     val composeRule = createEmptyComposeRule()
 
+    @Inject lateinit var downloads: DownloadRepository
+
     private var scenario: ActivityScenario<MainActivity>? = null
+
+    /** Each case starts with no persisted downloads and an empty viewer cache (state survives between cases). */
+    @Before
+    fun resetOfflineState() {
+        hilt.inject()
+        runBlocking { downloads.removeAll() }
+        ApplicationProvider
+            .getApplicationContext<Context>()
+            .cacheDir
+            .resolve("viewer")
+            .deleteRecursively()
+    }
 
     @After
     fun closeScenario() {
