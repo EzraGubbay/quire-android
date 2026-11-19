@@ -19,7 +19,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -107,6 +109,18 @@ class AppViewModelTest {
 
     private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api))
 
+    /** A repository whose eager state collection and persistence run on [scope], so a test scheduler can drive them. */
+    private fun sessionsOn(
+        scope: CoroutineScope,
+        storeName: String,
+    ): SessionRepository {
+        val store =
+            PreferenceDataStoreFactory.create(scope = scope) {
+                tmp.newFile("$storeName.preferences_pb").also { it.delete() }
+            }
+        return SessionRepository(store, FakeCipher(), scope)
+    }
+
     private suspend fun AppViewModel.resolved(): Boolean = signedIn.first { it != null }!!
 
     @Test
@@ -119,16 +133,27 @@ class AppViewModelTest {
         }
 
     @Test
-    fun storedSession_validatesOnce_andStaysSignedIn() =
-        runBlocking {
-            signedInSession()
-            val vm = vm()
-            assertTrue(vm.resolved())
-            vm.validation?.join()
-            assertEquals(1, api.meCalls)
-            assertTrue(vm.signedIn.value == true)
-            assertFalse(vm.sessionExpired.value)
+    fun storedSession_validatesOnce_andStaysSignedIn() {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        val testScope = CoroutineScope(dispatcher)
+        try {
+            runTest(dispatcher) {
+                val sessions = sessionsOn(testScope, "validates-once")
+                sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
+                advanceUntilIdle()
+
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api))
+                advanceUntilIdle()
+
+                assertEquals(true, vm.signedIn.value)
+                assertEquals(1, api.meCalls)
+                assertFalse(vm.sessionExpired.value)
+            }
+        } finally {
+            testScope.cancel()
         }
+    }
 
     @Test
     fun storedSession_meUnauthorized_clearsSession_andFlagsExpiry() =
@@ -191,18 +216,28 @@ class AppViewModelTest {
         }
 
     @Test
-    fun validateSession_whenSignedIn_revalidatesAfterRecreate() =
-        runBlocking {
-            signedInSession()
-            val vm = vm()
-            vm.resolved()
-            vm.validation?.join()
+    fun validateSession_whenSignedIn_revalidatesAfterRecreate() {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        val testScope = CoroutineScope(dispatcher)
+        try {
+            runTest(dispatcher) {
+                val sessions = sessionsOn(testScope, "revalidate")
+                sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
+                advanceUntilIdle()
 
-            vm.validateSession()
-            vm.validation?.join()
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api))
+                advanceUntilIdle()
 
-            assertEquals(2, api.meCalls)
+                vm.validateSession()
+                advanceUntilIdle()
+
+                assertEquals(2, api.meCalls)
+            }
+        } finally {
+            testScope.cancel()
         }
+    }
 
     @Test
     fun signOut_revokesToken_clearsSession_andRoutesToPair_withoutNotice() =

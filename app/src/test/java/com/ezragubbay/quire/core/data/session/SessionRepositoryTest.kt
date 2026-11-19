@@ -7,9 +7,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +24,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SessionRepositoryTest {
     @get:Rule
     val tmp = TemporaryFolder()
@@ -31,7 +36,8 @@ class SessionRepositoryTest {
     @After
     fun tearDown() = scope.cancel()
 
-    private fun store(): DataStore<Preferences> = PreferenceDataStoreFactory.create(scope = scope) { file }
+    private fun store(storeScope: CoroutineScope = scope): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create(scope = storeScope) { file }
 
     private fun repo(dataStore: DataStore<Preferences> = store()) = SessionRepository(dataStore, cipher, scope)
 
@@ -65,14 +71,26 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun tokenOrNull_isWarmAfterSignIn_andClearedOnSignOut() =
-        runBlocking {
-            val repo = repo()
-            repo.signInDefault()
-            assertEquals(TOKEN, repo.tokenOrNull())
-            repo.signOut()
-            assertNull(repo.tokenOrNull())
+    fun tokenOrNull_isWarmAfterSignIn_andClearedOnSignOut() {
+        // cachedToken is written both directly by signIn/signOut and by the eager state collection; drive that
+        // collection on the test scheduler so advanceUntilIdle() settles it before each assertion (no wall-clock race).
+        val dispatcher = UnconfinedTestDispatcher()
+        val testScope = CoroutineScope(dispatcher)
+        try {
+            runTest(dispatcher) {
+                val repo = SessionRepository(store(testScope), cipher, testScope)
+                repo.signInDefault()
+                advanceUntilIdle()
+                assertEquals(TOKEN, repo.tokenOrNull())
+
+                repo.signOut()
+                advanceUntilIdle()
+                assertNull(repo.tokenOrNull())
+            }
+        } finally {
+            testScope.cancel()
         }
+    }
 
     @Test
     fun tokenOrNull_isRestoredByEagerCollection_withoutBlockingRead() =
