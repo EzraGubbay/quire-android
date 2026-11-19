@@ -119,7 +119,10 @@ fun QuireApp(
             // NavBackStackEntry, crashing with "cannot access ... ViewModels after ... destroyed". Gating on the
             // entry's own lifecycle means the shell (and its nested graph) is never composed once the entry is dead.
             val lifecycleState by entry.lifecycle.currentStateAsState()
-            if (lifecycleState != Lifecycle.State.DESTROYED) {
+            // Also gate on isSignedIn: it flips in the same composition pass that observes sign-out / expiry, so
+            // the shell is disposed BEFORE the LaunchedEffect below pops (and destroys) its entry. That closes the
+            // race where a nested screen recomposed (e.g. on the 401 that expired the session) on a dead entry.
+            if (isSignedIn && lifecycleState != Lifecycle.State.DESTROYED) {
                 AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
             }
         }
