@@ -5,7 +5,9 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
@@ -110,8 +112,16 @@ fun QuireApp(
                 onBack = { navController.popBackStack() },
             )
         }
-        composable<ShellRoute> {
-            AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
+        composable<ShellRoute> { entry ->
+            // On sign-out / expiry the root pops this entry and routes to Pair. Navigation can still recompose the
+            // popped destination's content for a frame; if it does, the shell's nested NavHost would re-run its
+            // route-scoped screen (e.g. Courses) and re-resolve its hiltViewModel() on the now-destroyed
+            // NavBackStackEntry, crashing with "cannot access ... ViewModels after ... destroyed". Gating on the
+            // entry's own lifecycle means the shell (and its nested graph) is never composed once the entry is dead.
+            val lifecycleState by entry.lifecycle.currentStateAsState()
+            if (lifecycleState != Lifecycle.State.DESTROYED) {
+                AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
+            }
         }
     }
 }

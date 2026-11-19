@@ -122,13 +122,14 @@ class CoursesJourneyTest {
 
         // Pull-to-refresh issues a second GET /courses and upserts the cache.
         enqueueCourses()
-        // A synthesised swipeDown ends with a fling velocity the pull handler can consume before release, so the
-        // refetch never fires on the emulator. Drive a deliberate drag instead: press near the top, step the finger
-        // well past the refresh threshold, then release with no trailing velocity, so onRefresh fires exactly once.
-        composeRule.onNodeWithTag("courses-refresh").performTouchInput {
-            down(Offset(centerX, top + 4f))
-            val step = (height * 0.8f) / PULL_STEPS
-            repeat(PULL_STEPS) { moveBy(Offset(0f, step)) }
+        // A plain swipeDown releases with a fling velocity the nested-scroll pull handler consumes before it sees
+        // the drag past the threshold, so the refetch never fired on the emulator. Drive a deliberate pull on the
+        // scrollable list instead: press at the top, drag slowly well past the refresh threshold, hold to bleed off
+        // the velocity, then release — a pull (not a fling), so onRefresh fires exactly once.
+        composeRule.onNodeWithTag("course-list").performTouchInput {
+            down(Offset(centerX, top + 8f))
+            moveTo(Offset(centerX, height * 0.9f), delayMillis = 300)
+            advanceEventTime(300)
             up()
         }
 
@@ -244,12 +245,16 @@ class CoursesJourneyTest {
         launch()
         openSignalsCourse()
         composeRule.onNodeWithTag("tab-files").performClick()
+        // The Files tab arrives on the pager and fills from Room asynchronously; wait for a file row before
+        // reaching into it.
+        awaitTag("file-row-$LECTURE_FILE_ID")
 
-        // Each file row carries a type-label chip; a sort control is available. The first row sits low under the
-        // collapsing title + tabs + filter bar on the CI emulator, so its chip can start below the fold: scroll
-        // the file list to bring it fully on-screen before asserting (the sort control stays pinned above the list).
+        // Each file row carries a type-label chip; a sort control is available. The chip lives inside the row's
+        // merged (clickable) node, so read it from the unmerged tree (in the merged tree it collapses into the row);
+        // the first row sits low under the collapsing title + tabs + filter bar on the CI emulator, so scroll its
+        // chip fully on-screen before asserting (the sort control stays pinned above the list).
         composeRule
-            .onAllNodesWithTag("file-type-chip")[0]
+            .onAllNodesWithTag("file-type-chip", useUnmergedTree = true)[0]
             .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithTag("sort-control").assertIsDisplayed()
@@ -345,7 +350,6 @@ class CoursesJourneyTest {
 
     private companion object {
         const val TIMEOUT_MS = 10_000L
-        const val PULL_STEPS = 8
         const val LECTURE_FILE_ID = "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
         const val RECITATION_FILE_ID = "7a2d3b63-9c1f-4d7b-ae74-3b4b8d2eaf21"
         const val LECTURE_NOTE_ID = "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"
