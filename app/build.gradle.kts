@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -28,6 +30,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        // Version-freshness checks depend on the live Maven index, so they flip red with no code change.
+        // Dependency bumps are deliberate, separate changes.
+        disable +=
+            setOf(
+                "OldTargetApi",
+                "AndroidGradlePluginVersion",
+                "GradleDependency",
+                "NewerVersionAvailable",
+            )
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -38,6 +54,11 @@ kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("config/detekt/detekt.yml"))
 }
 
 dependencies {
