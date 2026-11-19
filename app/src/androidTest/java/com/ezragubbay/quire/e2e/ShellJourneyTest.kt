@@ -48,7 +48,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun launch_startsOnCoursesDestination() {
         composeRule.onNodeWithTag("app-root").assertIsDisplayed()
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
@@ -57,7 +56,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun switchingTabs_showsEachTopLevelDestination() {
         composeRule.onNodeWithTag("nav-downloads").performClick()
         composeRule.onNodeWithTag("screen-downloads").assertIsDisplayed()
@@ -74,7 +72,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun switchingTabsAndBack_keepsCoursesScrollState() {
         // Scroll a row into view on Courses...
         composeRule.onNodeWithTag("screen-courses").performScrollToNode(hasTestTag("course-row-19"))
@@ -92,7 +89,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun systemBack_fromOtherTab_returnsToCourses() {
         composeRule.onNodeWithTag("nav-chats").performClick()
         composeRule.onNodeWithTag("screen-chats").assertIsDisplayed()
@@ -106,7 +102,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun systemBack_fromCourses_exitsApp() {
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
 
@@ -117,7 +112,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun topBarAction_opensSettings() {
         composeRule.onNodeWithTag("action-settings").performClick()
         composeRule.onNodeWithTag("screen-settings").assertIsDisplayed()
@@ -125,7 +119,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
-    @Ignore("QMOB-E2")
     fun systemBack_fromSettings_returnsToShell() {
         composeRule.onNodeWithTag("action-settings").performClick()
         composeRule.onNodeWithTag("screen-settings").assertIsDisplayed()
