@@ -1,6 +1,5 @@
 package com.ezragubbay.quire.feature.courses.detail
 
-import android.text.format.Formatter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,22 +35,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezragubbay.quire.R
-import com.ezragubbay.quire.core.data.course.CourseFile
 import com.ezragubbay.quire.core.data.course.CourseNote
 import com.ezragubbay.quire.core.designsystem.component.EmptyState
 import com.ezragubbay.quire.core.designsystem.component.ErrorState
-import com.ezragubbay.quire.core.designsystem.component.FileTypeChip
 import com.ezragubbay.quire.core.designsystem.component.LoadingSkeleton
 import com.ezragubbay.quire.core.designsystem.component.QuireTopBar
+import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
+import com.ezragubbay.quire.feature.courses.files.FileSort
+import com.ezragubbay.quire.feature.courses.files.FilesTab
 import kotlinx.coroutines.launch
 
 private val TABS =
@@ -77,6 +75,8 @@ fun CourseScreen(
         state = state,
         onBack = onBack,
         onSelectFilter = viewModel::selectSessionFilter,
+        onToggleFileType = viewModel::toggleFileType,
+        onSelectFileSort = viewModel::selectFileSort,
         onRetry = viewModel::retry,
         onOpenFile = onOpenFile,
         onOpenNote = onOpenNote,
@@ -89,6 +89,8 @@ internal fun CourseContent(
     state: CourseUiState,
     onBack: () -> Unit,
     onSelectFilter: (SessionKind) -> Unit,
+    onToggleFileType: (FileType) -> Unit,
+    onSelectFileSort: (FileSort) -> Unit,
     onRetry: () -> Unit,
     onOpenFile: (String) -> Unit,
     onOpenNote: (String) -> Unit,
@@ -110,7 +112,15 @@ internal fun CourseContent(
                             retryTag = "action-retry",
                         )
                     }
-                is CourseUiState.Content -> CourseTabs(state, onSelectFilter, onOpenFile, onOpenNote)
+                is CourseUiState.Content ->
+                    CourseTabs(
+                        state,
+                        onSelectFilter,
+                        onToggleFileType,
+                        onSelectFileSort,
+                        onOpenFile,
+                        onOpenNote,
+                    )
             }
         }
     }
@@ -121,6 +131,8 @@ internal fun CourseContent(
 private fun CourseTabs(
     state: CourseUiState.Content,
     onSelectFilter: (SessionKind) -> Unit,
+    onToggleFileType: (FileType) -> Unit,
+    onSelectFileSort: (FileSort) -> Unit,
     onOpenFile: (String) -> Unit,
     onOpenNote: (String) -> Unit,
 ) {
@@ -153,7 +165,7 @@ private fun CourseTabs(
         HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
             when (page) {
                 0 -> SessionsTab(state, onSelectFilter, onOpenFile)
-                1 -> FilesTab(state.files, onOpenFile)
+                1 -> FilesTab(state.filesView, state.files.isEmpty(), onToggleFileType, onSelectFileSort, onOpenFile)
                 else -> NotesTab(state.notes, onOpenNote)
             }
         }
@@ -260,51 +272,6 @@ private fun SessionItem(
                     label = { Text(deck.title ?: deck.fileId) },
                     modifier = Modifier.testTag("session-deck-${deck.fileId}"),
                 )
-            }
-        }
-    }
-}
-
-/** Basic file list; grouping, type filters, sorting and the info sheet arrive with the Files-tab story (#33). */
-@Composable
-private fun FilesTab(
-    files: List<CourseFile>,
-    onOpenFile: (String) -> Unit,
-) {
-    if (files.isEmpty()) {
-        EmptyState(stringResource(R.string.course_files_empty), Modifier.testTag("file-list"))
-        return
-    }
-    val spacing = QuireTheme.spacing
-    val context = LocalContext.current
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().testTag("file-list"),
-        contentPadding = PaddingValues(vertical = spacing.sm),
-    ) {
-        items(files, key = { it.fileId }) { file ->
-            val pages = file.pageCount?.let { pluralStringResource(R.plurals.course_page_count, it, it) }
-            val size = Formatter.formatShortFileSize(context, file.sizeBytes)
-            Box(Modifier.testTag("file-row-${file.fileId}")) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 64.dp)
-                            .clickable { onOpenFile(file.fileId) }
-                            .padding(horizontal = spacing.md, vertical = spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.md),
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.xs)) {
-                        Text(file.title, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            if (pages == null) size else stringResource(R.string.course_file_meta, pages, size),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    FileTypeChip(file.type)
-                }
             }
         }
     }
