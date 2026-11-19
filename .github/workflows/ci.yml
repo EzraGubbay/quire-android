@@ -1,0 +1,196 @@
+# Android CI — the judge for the hard rules (spec: docs/CI-SPEC.md).
+#   PR into dev-rc : build + lint + unit-tests must pass.
+#   PR into main   : build + lint + unit-tests + e2e must pass.
+# Written before the Gradle project exists: `detect` keeps each job skipped until the files it needs land
+# (QMOB-E0-S1 scaffold, E0-S2 lint config, E0-S3 androidTest). A skipped job satisfies a required check.
+# Job names are the required status-check contexts in .github/rulesets/*.json — do not rename them.
+name: CI
+
+on:
+  pull_request:
+    branches: [dev-rc, main]
+  push:
+    branches: [dev-rc]
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: Run the emulator e2e job
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: '17'
+  EMULATOR_API_LEVEL: '34'
+  EMULATOR_ARCH: x86_64
+  EMULATOR_TARGET: google_apis
+
+jobs:
+  detect:
+    name: detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      gradle: ${{ steps.d.outputs.gradle }}
+      lint: ${{ steps.d.outputs.lint }}
+      android_test: ${{ steps.d.outputs.android_test }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: d
+        name: Detect what exists yet
+        run: |
+          flag() { if [ "$2" = "yes" ]; then echo "$1=true" >> "$GITHUB_OUTPUT"; else echo "$1=false" >> "$GITHUB_OUTPUT"; fi; }
+          g=no; [ -f gradlew ] && [ -f settings.gradle.kts ] && g=yes
+          l=no; [ "$g" = yes ] && [ -f config/detekt/detekt.yml ] && l=yes
+          t=no; [ "$g" = yes ] && [ -d app/src/androidTest ] && t=yes
+          flag gradle "$g"; flag lint "$l"; flag android_test "$t"
+          echo "gradle=$g lint=$l androidTest=$t"
+      - name: No secrets tracked in git
+        run: |
+          if git ls-files | grep -E '(\.jks|\.keystore|\.p12)$|(^|/)keystore\.properties$|(^|/)google-services\.json$'; then
+            echo "::error::Signing or Firebase files must never be committed."; exit 1
+          fi
+
+  build:
+    name: build
+    needs: detect
+    if: needs.detect.outputs.gradle == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Assemble debug APK
+        run: ./gradlew assembleDebug --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quire-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+  lint:
+    name: lint
+    needs: detect
+    if: needs.detect.outputs.lint == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: ktlint + detekt + Android Lint
+        run: ./gradlew ktlintCheck detekt lintDebug --continue --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: lint-reports
+          path: |
+            **/build/reports/ktlint/
+            **/build/reports/detekt/
+            **/build/reports/lint-results-*.html
+          retention-days: 7
+
+  unit-tests:
+    name: unit-tests
+    needs: detect
+    if: needs.detect.outputs.gradle == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: JVM unit tests (JUnit, Robolectric, Roborazzi verify)
+        run: ./gradlew testDebugUnitTest --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-reports
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+            **/build/outputs/roborazzi/
+          retention-days: 7
+
+  e2e:
+    name: e2e
+    needs: detect
+    # Required for main only. Also runs after every merge into dev-rc (early signal) and on demand.
+    if: >-
+      needs.detect.outputs.android_test == 'true' &&
+      ((github.event_name == 'pull_request' && github.base_ref == 'main') ||
+       github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.run_e2e))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release gate — no epic e2e spec may still be ignored
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: |
+          if grep -rn '@Ignore("QMOB' app/src/androidTest; then
+            echo "::error::Ignored epic e2e specs remain; finish or defer the epic before releasing to main."; exit 1
+          fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: AVD cache
+        id: avd-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ env.EMULATOR_API_LEVEL }}-${{ env.EMULATOR_ARCH }}-${{ env.EMULATOR_TARGET }}
+      - name: Create AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.EMULATOR_API_LEVEL }}
+          arch: ${{ env.EMULATOR_ARCH }}
+          target: ${{ env.EMULATOR_TARGET }}
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "AVD snapshot created"
+      - name: Instrumented tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.EMULATOR_API_LEVEL }}
+          arch: ${{ env.EMULATOR_ARCH }}
+          target: ${{ env.EMULATOR_TARGET }}
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-reports
+          path: |
+            **/build/reports/androidTests/
+            **/build/outputs/androidTest-results/
+          retention-days: 7

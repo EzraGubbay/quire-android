@@ -1,0 +1,21 @@
+# Secrets — never commit (CI fails if these are tracked)
+*.jks
+*.keystore
+*.p12
+keystore.properties
+google-services.json
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
