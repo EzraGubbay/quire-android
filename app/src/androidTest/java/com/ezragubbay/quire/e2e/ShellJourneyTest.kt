@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -37,22 +38,23 @@ class ShellJourneyTest {
     @get:Rule(order = 0)
     val hilt = HiltAndroidRule(this)
 
-    // The shell is only shown to a paired install.
+    // The hermetic server starts first so the seeded session can point at it (Courses fetches from it).
     @get:Rule(order = 1)
-    val session = SessionSeedRule(signedIn = true)
+    val server = MockWebServerRule(answerSessionCheckOutOfBand = true)
 
+    // The shell is only shown to a paired install.
     @get:Rule(order = 2)
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val session = SessionSeedRule(signedIn = true, serverUrl = { server.baseUrl })
 
     @get:Rule(order = 3)
-    val server = MockWebServerRule()
+    val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Before
     fun seedCourses() {
         // Wire the journey to MockWebServer per the harness contract. The shell renders placeholder
         // screens and does not read this yet; the data stories (E4) will consume it. Enqueued here so
         // the journey is hermetic and ready once network lands.
-        server.enqueueFixture("courses.json")
+        server.enqueueFixture("courses-list.json")
     }
 
     // --- Navigation: un-ignored by QMOB-E2-S2 (#18) ---------------------------------------------
@@ -84,9 +86,12 @@ class ShellJourneyTest {
     // un-ignored by QMOB-E2-S2 (#18)
     @Test
     fun switchingTabsAndBack_keepsCoursesScrollState() {
-        // Scroll a row into view on Courses...
-        composeRule.onNodeWithTag("screen-courses").performScrollToNode(hasTestTag("course-row-19"))
-        composeRule.onNodeWithTag("course-row-19").assertIsDisplayed()
+        // Scroll a row into view on Courses (once the list has replaced the loading skeleton)...
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithTag("course-list").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("course-list").performScrollToNode(hasTestTag("course-card-intro-to-ml"))
+        composeRule.onNodeWithTag("course-card-intro-to-ml").assertIsDisplayed()
 
         // ...leave to another tab and come back...
         composeRule.onNodeWithTag("nav-downloads").performClick()
@@ -95,7 +100,7 @@ class ShellJourneyTest {
 
         // ...the scrolled row is still shown without re-scrolling (per-tab scroll state kept).
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
-        composeRule.onNodeWithTag("course-row-19").assertIsDisplayed()
+        composeRule.onNodeWithTag("course-card-intro-to-ml").assertIsDisplayed()
     }
 
     // un-ignored by QMOB-E2-S2 (#18)

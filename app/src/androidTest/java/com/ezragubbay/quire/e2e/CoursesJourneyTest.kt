@@ -22,6 +22,7 @@ import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Ignore
@@ -67,15 +68,16 @@ class CoursesJourneyTest {
     @get:Rule(order = 0)
     val hilt = HiltAndroidRule(this)
 
-    // The browse surface is only shown to a paired (signed-in) install.
+    // The hermetic server starts first so the seeded session can point at it (browse data is fetched from it).
     @get:Rule(order = 1)
-    val session = SessionSeedRule(signedIn = true)
+    val server = MockWebServerRule(answerSessionCheckOutOfBand = true)
 
+    // The browse surface is only shown to a paired (signed-in) install.
     @get:Rule(order = 2)
-    val composeRule = createEmptyComposeRule()
+    val session = SessionSeedRule(signedIn = true, serverUrl = { server.baseUrl })
 
     @get:Rule(order = 3)
-    val server = MockWebServerRule()
+    val composeRule = createEmptyComposeRule()
 
     private var scenario: ActivityScenario<MainActivity>? = null
 
@@ -87,7 +89,6 @@ class CoursesJourneyTest {
     // --- Courses list: un-ignored by QMOB-E4-S2 (#31) -------------------------------------------
 
     // un-ignored by QMOB-E4-S2 (#31)
-    @Ignore("QMOB-E4")
     @Test
     fun signedInLaunch_showsSemesterGroupedCourseList() {
         enqueueCourses()
@@ -95,6 +96,7 @@ class CoursesJourneyTest {
 
         // Courses is the shell start destination; its list is grouped under sticky semester headers.
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
+        awaitTag("course-list") // the list replaces the skeleton once GET /courses lands
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
         composeRule.onNodeWithTag("course-group-winter-2026").assertIsDisplayed()
         composeRule.onNodeWithTag("course-group-spring-2026").assertIsDisplayed()
@@ -108,31 +110,34 @@ class CoursesJourneyTest {
     }
 
     // un-ignored by QMOB-E4-S2 (#31)
-    @Ignore("QMOB-E4")
     @Test
     fun coursesList_pullToRefresh_refetchesFromServer() {
         enqueueCourses()
         launch()
+        awaitTag("course-list")
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
-        server.takeRequest() // the first GET /courses on launch
+        takeCoursesRequest() // the first GET /courses on launch
 
         // Pull-to-refresh issues a second GET /courses and upserts the cache.
         enqueueCourses()
-        composeRule.onNodeWithTag("courses-refresh").performTouchInput { swipeDown() }
+        // Start inside the node (not on its top edge, where the injected gesture never reaches the pull handler).
+        composeRule
+            .onNodeWithTag("courses-refresh")
+            .performTouchInput { swipeDown(startY = height * 0.1f, endY = height * 0.8f, durationMillis = 500) }
 
-        val refresh = server.takeRequest()
+        val refresh = takeCoursesRequest()
         assertTrue("Pull-to-refresh must GET /courses again", refresh.path!!.endsWith("/courses"))
         assertTrue("Refresh must be a GET", refresh.method == "GET")
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
     }
 
     // un-ignored by QMOB-E4-S2 (#31)
-    @Ignore("QMOB-E4")
     @Test
     fun relaunchWithServerDown_showsCachedCourses_withOfflineBanner() {
         // First launch populates the Room cache from the server.
         enqueueCourses()
         launch()
+        awaitTag("course-card-signals-and-systems")
         composeRule.onNodeWithTag("course-card-signals-and-systems").assertIsDisplayed()
 
         // The server goes away; a cold relaunch must still render the cached list offline-first,
@@ -141,6 +146,8 @@ class CoursesJourneyTest {
         relaunch()
         composeRule.waitForIdle()
 
+        // The cached list renders from Room; the failed refresh then raises the offline banner.
+        awaitTag("offline-banner")
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
         composeRule.onNodeWithTag("course-card-signals-and-systems").assertIsDisplayed()
@@ -296,6 +303,14 @@ class CoursesJourneyTest {
         server.enqueueFixture("course-sessions.json")
         server.enqueueFixture("course-files.json")
         server.enqueueFixture("course-notes.json")
+    }
+
+    /** The next recorded `GET .../courses` request, skipping the session check. */
+    private fun takeCoursesRequest(): RecordedRequest {
+        while (true) {
+            val request = server.takeRequest()
+            if (request.path!!.endsWith("/courses")) return request
+        }
     }
 
     /** Launches [MainActivity] (signed-in: lands on the Courses shell). */
