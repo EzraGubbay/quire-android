@@ -12,6 +12,13 @@ data class CourseRoute(
 @Serializable
 data object SearchRoute
 
+/** The read-only note reader for [noteId] of course [courseSlug]; pushed over the shell from the Notes tab. */
+@Serializable
+data class NoteReaderRoute(
+    val courseSlug: String,
+    val noteId: String,
+)
+
 /** The PDF viewer for [fileId] of course [courseSlug]; pushed over the shell (open-file flow, #38, targets it). */
 @Serializable
 data class ViewerRoute(

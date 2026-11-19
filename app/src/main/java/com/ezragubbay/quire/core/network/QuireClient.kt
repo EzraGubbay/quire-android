@@ -34,6 +34,11 @@ class QuireClient(
         }
 
     override suspend fun notes(slug: String): ApiResult<List<NoteDto>> = apiCall(requireBody = true) { api.notes(slug) }
+
+    override suspend fun note(
+        slug: String,
+        noteId: String,
+    ): ApiResult<NoteDetailDto> = apiCall(requireBody = true) { api.note(slug, noteId) }
 }
 
 /**

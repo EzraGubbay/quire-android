@@ -7,6 +7,7 @@ import com.ezragubbay.quire.core.network.CourseDetailDto
 import com.ezragubbay.quire.core.network.CourseFileDto
 import com.ezragubbay.quire.core.network.CourseSessionDto
 import com.ezragubbay.quire.core.network.CourseSummaryDto
+import com.ezragubbay.quire.core.network.NoteDetailDto
 import com.ezragubbay.quire.core.network.NoteDto
 import kotlinx.coroutines.CompletableDeferred
 import java.io.IOException
@@ -62,4 +63,9 @@ class FakeBrowseApi : BrowseApi {
     override suspend fun files(slug: String) = files
 
     override suspend fun notes(slug: String) = notes
+
+    override suspend fun note(
+        slug: String,
+        noteId: String,
+    ): ApiResult<NoteDetailDto> = ApiResult.Failure.NotFound()
 }

@@ -297,8 +297,6 @@ class ReaderJourneyTest {
 
     // --- Notes reader (Markdown + math): un-ignored by QMOB-E5-S6 (#42) --------------------------
 
-    // un-ignored by QMOB-E5-S6 (#42)
-    @Ignore("QMOB-E5")
     @Test
     fun openNote_fromNotesTab_rendersMarkdownBody() {
         enqueueCourses()
@@ -315,8 +313,6 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("note-markdown").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E5-S6 (#42)
-    @Ignore("QMOB-E5")
     @Test
     fun noteReader_rendersMathBlock() {
         enqueueCourses()

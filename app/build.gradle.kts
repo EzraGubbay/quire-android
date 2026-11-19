@@ -125,6 +125,8 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.hilt.android)
+    implementation(libs.markwon.core)
+    implementation(libs.markwon.ext.latex)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
