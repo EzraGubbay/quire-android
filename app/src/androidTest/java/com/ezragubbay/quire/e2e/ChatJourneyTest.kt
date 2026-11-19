@@ -259,7 +259,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun stream_errorMidStream_keepsPartial_showsRetry_retrySucceeds() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -288,7 +287,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun stream_budgetReached_showsError_withoutRetry() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -311,7 +309,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun preStream_aiUnavailable_showsError() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -332,7 +329,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun conversation_offline_disablesComposer_showsBanner() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
