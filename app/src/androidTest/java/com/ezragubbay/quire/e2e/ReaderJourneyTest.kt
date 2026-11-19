@@ -109,6 +109,11 @@ class ReaderJourneyTest {
         runCatching {
             WorkManager.initialize(context, Configuration.Builder().setWorkerFactory(DelegatingWorkerFactory).build())
         } // already initialised by an earlier case in this process
+        WorkManager
+            .getInstance(context)
+            .cancelAllWork()
+            .result
+            .get() // no download work leaks between cases
         // Direct DAO/file reset: going through DownloadRepository would touch WorkManager before the app starts.
         runBlocking { db.downloadDao().deleteAll() }
         context.cacheDir.resolve("viewer").deleteRecursively()

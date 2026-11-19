@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -138,7 +139,8 @@ internal fun PdfViewerContent(
     onToggleImmersive: () -> Unit,
 ) {
     val ready = state as? ViewerUiState.Ready
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = ready?.startPage ?: 0)
+    // Keyed on the document so the list is created once the restored page is known (the first composition is Loading).
+    val listState = key(ready?.document) { rememberLazyListState(initialFirstVisibleItemIndex = ready?.startPage ?: 0) }
     val currentPage by remember { derivedStateOf { listState.firstVisibleItemIndex } }
     var jumpOpen by remember { mutableStateOf(false) }
     Scaffold(
