@@ -52,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.designsystem.component.ErrorState
+import com.ezragubbay.quire.core.network.CitationDto
 import com.ezragubbay.quire.feature.notes.BlockView
 import com.ezragubbay.quire.feature.notes.NoteBlock
 import com.ezragubbay.quire.feature.notes.rememberMarkwon
@@ -72,6 +73,7 @@ const val CHAT_OFFLINE_BANNER_TAG = "chat-offline-banner"
 @Composable
 fun ConversationScreen(
     onBack: () -> Unit,
+    onOpenCitation: (CitationDto) -> Unit = {},
     documentHeader: (@Composable () -> Unit)? = null,
     viewModel: ConversationViewModel = hiltViewModel(),
 ) {
@@ -84,6 +86,7 @@ fun ConversationScreen(
         viewModel::retryHistory,
         viewModel::retry,
         documentHeader,
+        onOpenCitation,
     )
 }
 
@@ -97,6 +100,7 @@ internal fun ConversationContent(
     onRetryHistory: () -> Unit,
     onRetry: () -> Unit,
     documentHeader: (@Composable () -> Unit)? = null,
+    onOpenCitation: (CitationDto) -> Unit = {},
 ) {
     Scaffold(
         modifier = Modifier.testTag(CONVERSATION_TAG).imePadding(),
@@ -121,7 +125,7 @@ internal fun ConversationContent(
             if (state.historyFailed) {
                 ErrorState(stringResource(R.string.conversation_history_error), onRetry = onRetryHistory)
             } else {
-                MessageList(state, onRetry, Modifier.weight(1f))
+                MessageList(state, onRetry, onOpenCitation, Modifier.weight(1f))
             }
         }
     }
@@ -131,6 +135,7 @@ internal fun ConversationContent(
 private fun MessageList(
     state: ConversationUiState,
     onRetry: () -> Unit,
+    onOpenCitation: (CitationDto) -> Unit,
     modifier: Modifier,
 ) {
     val bubbles = state.bubbles
@@ -150,7 +155,7 @@ private fun MessageList(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             itemsIndexed(bubbles, key = { index, _ -> index }) { index, bubble ->
-                BubbleView(index, bubble)
+                BubbleView(index, bubble, onOpenCitation)
             }
             if (state.error != null) {
                 item(key = "error") {
@@ -217,6 +222,7 @@ private fun derivedAtBottom(listState: LazyListState) = derivedStateOf { !listSt
 private fun BubbleView(
     index: Int,
     bubble: Bubble,
+    onOpenCitation: (CitationDto) -> Unit,
 ) {
     val isUser = bubble.role == Role.User
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start) {
@@ -238,6 +244,7 @@ private fun BubbleView(
                     SelectionContainer { Text(bubble.text, style = MaterialTheme.typography.bodyLarge) }
                 } else {
                     AnswerBody(bubble.text)
+                    AnswerCitations(bubble.text, bubble.citations, onOpenCitation)
                     if (bubble.stopped) {
                         Text(
                             stringResource(R.string.conversation_stopped),

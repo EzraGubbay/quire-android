@@ -20,4 +20,11 @@ object RenderWindow {
         saved: Int,
         pageCount: Int,
     ): Int = if (pageCount <= 0) 0 else saved.coerceIn(0, pageCount - 1)
+
+    /** The 0-based page to open on: an explicit 1-based [requested] page wins over the [saved] 0-based one. */
+    fun initialPage(
+        requested: Int?,
+        saved: Int?,
+        pageCount: Int,
+    ): Int = clampPage(requested?.minus(1) ?: saved ?: 0, pageCount)
 }

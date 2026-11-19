@@ -31,6 +31,7 @@ import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
 import com.ezragubbay.quire.feature.chat.conversation.ConversationScreen
 import com.ezragubbay.quire.feature.chat.conversation.DocumentHeader
+import com.ezragubbay.quire.feature.chat.conversation.toViewerRoute
 import com.ezragubbay.quire.feature.chat.threads.CourseThreadsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
@@ -142,9 +143,11 @@ fun AppShell(
             }
             composable<NoteReaderRoute> { NoteReaderScreen(onBack = { navController.popBackStack() }) }
             composable<ConversationRoute> { entry ->
-                val documentTitle = entry.toRoute<ConversationRoute>().documentTitle
+                val route = entry.toRoute<ConversationRoute>()
+                val documentTitle = route.documentTitle
                 ConversationScreen(
                     onBack = { navController.popBackStack() },
+                    onOpenCitation = { c -> c.toViewerRoute(route.courseSlug)?.let { navController.navigate(it) } },
                     documentHeader = documentTitle?.let { { DocumentHeader(it) } },
                 )
             }
