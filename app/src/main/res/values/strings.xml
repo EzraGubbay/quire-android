@@ -83,4 +83,25 @@
         <item quantity="one">%d page</item>
         <item quantity="other">%d pages</item>
     </plurals>
+    <string name="files_sort_course">Course order</string>
+    <string name="files_sort_title">Title</string>
+    <string name="files_sort_recent">Recently updated</string>
+    <string name="files_filtered_empty">No files match these filters</string>
+    <string name="files_group_lecture">Lectures</string>
+    <string name="files_group_recitation">Recitations</string>
+    <string name="files_group_homework">Homework</string>
+    <string name="files_group_exam">Exams</string>
+    <string name="files_group_book">Books</string>
+    <string name="files_group_paper">Papers</string>
+    <string name="files_group_other">Other</string>
+    <string name="files_info_more">File details</string>
+    <string name="files_info_type">Type</string>
+    <string name="files_info_location">Session or folder</string>
+    <string name="files_info_pages">Pages</string>
+    <string name="files_info_size">Size</string>
+    <string name="files_info_formats">Available formats</string>
+    <string name="files_info_no_formats">None</string>
+    <string name="files_format_pdf">PDF</string>
+    <string name="files_format_original">Original</string>
+    <string name="files_format_markdown">Markdown</string>
 </resources>

@@ -25,7 +25,6 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -211,7 +210,6 @@ class CoursesJourneyTest {
     // --- Files tab: un-ignored by QMOB-E4-S4 (#33) ----------------------------------------------
 
     // un-ignored by QMOB-E4-S4 (#33)
-    @Ignore("QMOB-E4")
     @Test
     fun filesTab_recitationFilterChip_narrowsList() {
         enqueueCourses()
@@ -231,7 +229,6 @@ class CoursesJourneyTest {
     }
 
     // un-ignored by QMOB-E4-S4 (#33)
-    @Ignore("QMOB-E4")
     @Test
     fun filesTab_showsTypeChipsAndSortControl() {
         enqueueCourses()
@@ -248,7 +245,6 @@ class CoursesJourneyTest {
     }
 
     // un-ignored by QMOB-E4-S4 (#33)
-    @Ignore("QMOB-E4")
     @Test
     fun filesTab_openFileInfoSheet_showsFormatsAndSize() {
         enqueueCourses()

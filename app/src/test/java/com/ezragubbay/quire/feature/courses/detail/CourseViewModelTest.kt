@@ -11,6 +11,7 @@ import com.ezragubbay.quire.core.data.course.Loaded
 import com.ezragubbay.quire.core.data.course.SyncState
 import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.network.ApiResult
+import com.ezragubbay.quire.feature.courses.files.FileSort
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -94,6 +95,33 @@ class CourseViewModelTest {
             assertEquals(listOf("f1"), content.files.map { it.fileId })
             assertEquals(listOf("n1"), content.notes.map { it.id })
             assertFalse(content.offline)
+        }
+
+    @Test
+    fun filesTab_filterAndSortSurviveRecreation() =
+        runTest {
+            val handle = SavedStateHandle(mapOf("slug" to "signals"))
+            val vm = CourseViewModel(handle, source)
+            val ui = latest(vm)
+            source.emit(
+                files =
+                    listOf(
+                        file("l", "Zeta", FileType.LECTURE),
+                        file("r", "Alpha", FileType.RECITATION),
+                    ),
+            )
+            vm.toggleFileType(FileType.RECITATION)
+            vm.selectFileSort(FileSort.TITLE)
+
+            val view = (ui() as CourseUiState.Content).filesView
+            assertEquals(listOf(FileType.RECITATION), view.groups.map { it.type })
+            assertEquals(FileSort.TITLE, view.sort)
+
+            val recreated = latest(CourseViewModel(handle, source))
+            assertEquals(setOf(FileType.RECITATION), (recreated() as CourseUiState.Content).filesView.selectedTypes)
+
+            vm.toggleFileType(FileType.RECITATION)
+            assertEquals(2, (ui() as CourseUiState.Content).filesView.groups.size)
         }
 
     @Test
@@ -223,11 +251,12 @@ class CourseViewModelTest {
         fun file(
             id: String,
             title: String = id,
+            type: FileType = FileType.LECTURE,
         ) = CourseFile(
             id,
             "signals",
             title,
-            FileType.LECTURE,
+            type,
             1,
             null,
             null,

@@ -10,6 +10,12 @@ import com.ezragubbay.quire.core.data.course.CourseRepository
 import com.ezragubbay.quire.core.data.course.CourseSession
 import com.ezragubbay.quire.core.data.course.Loaded
 import com.ezragubbay.quire.core.data.course.SyncState
+import com.ezragubbay.quire.core.designsystem.theme.FileType
+import com.ezragubbay.quire.feature.courses.files.FileSort
+import com.ezragubbay.quire.feature.courses.files.FilesView
+import com.ezragubbay.quire.feature.courses.files.buildFilesView
+import com.ezragubbay.quire.feature.courses.files.parseSelectedTypes
+import com.ezragubbay.quire.feature.courses.files.tag
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -26,6 +32,8 @@ import javax.inject.Inject
 
 private const val SUBSCRIPTION_TIMEOUT_MS = 5_000L
 private const val FILTER_KEY = "sessionFilter"
+private const val FILE_TYPES_KEY = "fileTypes"
+private const val FILE_SORT_KEY = "fileSort"
 
 /** What the course screen needs from the data layer (a seam so the ViewModel is testable without Room). */
 interface CourseSource {
@@ -104,6 +112,8 @@ sealed interface CourseUiState {
         /** Sessions of [sessionFilter], in timeline order. */
         val sessions: List<SessionRow>,
         val files: List<CourseFile>,
+        /** [files] filtered, sorted and grouped for the Files tab. */
+        val filesView: FilesView,
         val notes: List<CourseNote>,
         /** Network is down but cached data is shown. */
         val offline: Boolean,
@@ -127,6 +137,8 @@ private fun toUiState(
     bundle: Bundle,
     selected: SessionKind?,
     slug: String,
+    fileTypes: Set<FileType>,
+    fileSort: FileSort,
 ): CourseUiState {
     val detail = bundle.detail.data
     val state = bundle.detail.state
@@ -167,6 +179,7 @@ private fun toUiState(
                 )
             },
         files = bundle.files,
+        filesView = buildFilesView(bundle.files, fileTypes, fileSort),
         notes = bundle.notes,
         offline = (state as? SyncState.Failed)?.isOffline == true,
     )
@@ -186,23 +199,42 @@ class CourseViewModel
         /** The explicit Lectures / Recitations choice (survives process death); null picks a default. */
         private val selectedFilter = savedState.getStateFlow<String?>(FILTER_KEY, null)
 
+        /** Files-tab filter and sort, kept in the SavedStateHandle so they survive rotation and process death. */
+        private val fileTypes = savedState.getStateFlow<ArrayList<String>?>(FILE_TYPES_KEY, null)
+        private val fileSort = savedState.getStateFlow<String?>(FILE_SORT_KEY, null)
+
+        private val selection = combine(selectedFilter, fileTypes, fileSort) { f, t, s -> Triple(f, t, s) }
+
         val state: StateFlow<CourseUiState> =
             combine(
                 source.observeCourse(slug),
                 source.observeSessions(slug),
                 source.observeFiles(slug),
                 source.observeNotes(slug),
-                selectedFilter,
-            ) { detail, sessions, files, notes, selected ->
+                selection,
+            ) { detail, sessions, files, notes, (selected, types, sort) ->
                 toUiState(
                     Bundle(detail, sessions.data, files.data, notes.data),
                     SessionKind.entries.firstOrNull { it.key == selected },
                     slug,
+                    parseSelectedTypes(types),
+                    FileSort.fromKey(sort),
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), CourseUiState.Loading)
 
         fun selectSessionFilter(kind: SessionKind) {
             savedState[FILTER_KEY] = kind.key
+        }
+
+        /** Toggles [type] in the Files-tab multi-select filter. */
+        fun toggleFileType(type: FileType) {
+            val current = parseSelectedTypes(savedState.get<ArrayList<String>?>(FILE_TYPES_KEY))
+            val next = if (type in current) current - type else current + type
+            savedState[FILE_TYPES_KEY] = ArrayList(next.map { it.tag })
+        }
+
+        fun selectFileSort(sort: FileSort) {
+            savedState[FILE_SORT_KEY] = sort.key
         }
 
         /** Retry from the error state. */
