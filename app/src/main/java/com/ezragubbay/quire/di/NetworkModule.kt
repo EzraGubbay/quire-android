@@ -1,6 +1,7 @@
 package com.ezragubbay.quire.di
 
 import com.ezragubbay.quire.BuildConfig
+import com.ezragubbay.quire.core.network.ContentApi
 import com.ezragubbay.quire.core.network.NetworkOptions
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.QuireClientFactory
@@ -29,6 +30,20 @@ object NetworkModule {
     @Provides
     @Singleton
     fun tokenCache(tokens: TokenProvider): TokenCache = TokenCache(tokens)
+
+    @Provides
+    @Singleton
+    fun contentApi(
+        config: ServerConfigProvider,
+        tokens: TokenCache,
+        events: SessionEvents,
+    ): ContentApi =
+        QuireClientFactory.contentApi(
+            config = config,
+            tokens = tokens,
+            events = events,
+            options = NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+        )
 
     @Provides
     @Singleton

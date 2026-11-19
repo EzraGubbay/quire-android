@@ -83,3 +83,32 @@ data class NoteEntity(
     val sessionNumber: Int?,
     val updatedAt: String,
 )
+
+/** Persisted state of one offline download. Room is the source of truth; the worker and repository write it. */
+@Entity(tableName = "downloads", indices = [Index("courseSlug")])
+data class DownloadEntity(
+    @PrimaryKey val fileId: String,
+    val courseSlug: String,
+    /** `pdf`, `original` or `markdown` (the content endpoint's `format` query value). */
+    val format: String,
+    /** One of [DownloadEntity.QUEUED], [RUNNING], [DONE], [FAILED]. */
+    val state: String,
+    /** Bytes on disk so far (the `.part` length while running, the file size once done). */
+    val progressBytes: Long,
+    /** Full size when known, else [UNKNOWN_TOTAL]. */
+    val totalBytes: Long,
+    /** Absolute path of the finished file; set only when [state] is [DONE]. */
+    val localPath: String?,
+    /** Validator of the bytes in the `.part` file; used with `If-Range` to resume. */
+    val etag: String?,
+    val error: String?,
+    val updatedAt: Long,
+) {
+    companion object {
+        const val QUEUED = "QUEUED"
+        const val RUNNING = "RUNNING"
+        const val DONE = "DONE"
+        const val FAILED = "FAILED"
+        const val UNKNOWN_TOTAL = -1L
+    }
+}
