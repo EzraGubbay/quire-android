@@ -1,3 +1,6 @@
+import com.ezragubbay.quire.build.VersionParser
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +8,13 @@ plugins {
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
 }
+
+val versionPropertiesFile = rootProject.file("version.properties")
+
+fun loadVersion() =
+    VersionParser.parse(
+        Properties().apply { versionPropertiesFile.reader().use(::load) },
+    )
 
 android {
     namespace = "com.ezragubbay.quire"
@@ -14,8 +24,8 @@ android {
         applicationId = "com.ezragubbay.quire"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = loadVersion().code
+        versionName = loadVersion().name
         testInstrumentationRunner = "com.ezragubbay.quire.testing.QuireTestRunner"
     }
 
@@ -46,7 +56,13 @@ android {
 
     testOptions {
         animationsDisabled = true
+        unitTests.all {
+            it.systemProperty("versionPropertiesPath", versionPropertiesFile.absolutePath)
+        }
     }
+
+    // The version parser lives in buildSrc (used by this script); unit tests compile it directly.
+    sourceSets.getByName("test").java.srcDir(rootProject.file("buildSrc/src/main/kotlin"))
 
     buildFeatures {
         compose = true
@@ -58,6 +74,18 @@ kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
+}
+
+tasks.register("printVersion") {
+    val file = versionPropertiesFile
+    inputs.file(file)
+    doLast { println(loadVersion()) }
+}
+
+tasks.register("verifyVersion") {
+    val file = versionPropertiesFile
+    inputs.file(file)
+    doLast { println("version.properties OK: ${loadVersion()}") }
 }
 
 detekt {
