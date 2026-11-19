@@ -8,7 +8,7 @@ import java.io.IOException
 /** Typed entry point to the mobile API: every call returns an [ApiResult] and never throws. */
 class QuireClient(
     private val api: QuireApi,
-) {
+) : BrowseApi {
     suspend fun pair(
         code: String,
         deviceName: String,
@@ -17,6 +17,16 @@ class QuireClient(
     suspend fun me(): ApiResult<MeResponse> = apiCall { api.me() }
 
     suspend fun revokeToken(): ApiResult<Unit> = apiCall { api.revokeToken() }
+
+    override suspend fun courses(): ApiResult<List<CourseSummaryDto>> = apiCall { api.courses() }
+
+    override suspend fun course(slug: String): ApiResult<CourseDetailDto> = apiCall { api.course(slug) }
+
+    override suspend fun sessions(slug: String): ApiResult<List<CourseSessionDto>> = apiCall { api.sessions(slug) }
+
+    override suspend fun files(slug: String): ApiResult<List<CourseFileDto>> = apiCall { api.files(slug) }
+
+    override suspend fun notes(slug: String): ApiResult<List<NoteDto>> = apiCall { api.notes(slug) }
 }
 
 /** Runs [call] and maps the response, error envelope and exceptions into an [ApiResult]. */
