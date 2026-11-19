@@ -211,3 +211,43 @@ abstract class ReadingPositionDao {
     @Upsert
     abstract suspend fun upsert(position: ReadingPositionEntity)
 }
+
+@Dao
+abstract class ThreadDao {
+    @Query("SELECT * FROM threads ORDER BY updatedAt DESC")
+    abstract fun observeRecent(): Flow<List<ThreadEntity>>
+
+    @Query("SELECT * FROM threads WHERE courseSlug = :slug ORDER BY updatedAt DESC")
+    abstract fun observeCourse(slug: String): Flow<List<ThreadEntity>>
+
+    @Query("SELECT * FROM threads ORDER BY updatedAt DESC LIMIT 1")
+    abstract suspend fun latest(): ThreadEntity?
+
+    @Upsert
+    abstract suspend fun upsert(thread: ThreadEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    protected abstract suspend fun insertAll(rows: List<ThreadEntity>)
+
+    @Query("DELETE FROM threads")
+    protected abstract suspend fun deleteAll()
+
+    @Query("DELETE FROM threads WHERE courseSlug = :slug")
+    protected abstract suspend fun deleteForCourse(slug: String)
+
+    /** The server's full thread list replaces the cache. */
+    @Transaction
+    open suspend fun replaceAll(rows: List<ThreadEntity>) {
+        deleteAll()
+        insertAll(rows)
+    }
+
+    @Transaction
+    open suspend fun replaceForCourse(
+        slug: String,
+        rows: List<ThreadEntity>,
+    ) {
+        deleteForCourse(slug)
+        insertAll(rows)
+    }
+}

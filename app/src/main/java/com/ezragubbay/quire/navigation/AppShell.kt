@@ -30,6 +30,7 @@ import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
 import com.ezragubbay.quire.feature.chat.conversation.ConversationScreen
+import com.ezragubbay.quire.feature.chat.threads.CourseThreadsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
@@ -61,6 +62,7 @@ fun AppShell(
             destination?.hasRoute<SearchRoute>() == true ||
             destination?.hasRoute<ViewerRoute>() == true ||
             destination?.hasRoute<NoteReaderRoute>() == true ||
+            destination?.hasRoute<CourseThreadsRoute>() == true ||
             destination?.hasRoute<ConversationRoute>() == true
     val current = TopLevelDestination.entries.firstOrNull { destination?.hasRoute(it.route::class) == true }
 
@@ -120,6 +122,13 @@ fun AppShell(
                     onBack = { navController.popBackStack() },
                     onOpenFile = { navController.navigate(ViewerRoute(slug, it)) },
                     onOpenNote = { navController.navigate(NoteReaderRoute(slug, it)) },
+                    onAsk = { navController.navigate(CourseThreadsRoute(slug)) },
+                )
+            }
+            composable<CourseThreadsRoute> {
+                CourseThreadsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) },
                 )
             }
             composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
@@ -132,7 +141,9 @@ fun AppShell(
                 )
             }
             composable<DownloadsRoute> { DownloadsScreen() }
-            composable<ChatsRoute> { ChatsScreen() }
+            composable<ChatsRoute> {
+                ChatsScreen(onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) })
+            }
             composable<SettingsRoute> {
                 SettingsScreen(
                     account = account,

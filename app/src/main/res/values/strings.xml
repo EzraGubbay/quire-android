@@ -150,4 +150,13 @@
     <string name="downloads_state_downloading">Downloading %1$s</string>
     <string name="downloads_state_done">Downloaded - %1$s</string>
     <string name="downloads_state_failed">Failed: %1$s</string>
+    <string name="chats_new">New chat</string>
+    <string name="chats_empty_title">No chats yet</string>
+    <string name="chats_empty_message">Start a conversation about a course with New chat.</string>
+    <string name="chats_error">Couldn\'t load your chats.</string>
+    <string name="chats_offline">Offline \u2014 showing saved chats (read-only)</string>
+    <string name="chats_create_failed">Couldn\'t start a new chat. Check your connection.</string>
+    <string name="chats_document_badge">Document</string>
+    <string name="chats_course_title">Course chats</string>
+    <string name="course_ask">Ask</string>
 </resources>
