@@ -112,3 +112,11 @@ data class DownloadEntity(
         const val UNKNOWN_TOTAL = -1L
     }
 }
+
+/** The last-read page (0-based) of one file in the PDF viewer. */
+@Entity(tableName = "reading_positions")
+data class ReadingPositionEntity(
+    @PrimaryKey val fileId: String,
+    val page: Int,
+    val updatedAt: Long,
+)

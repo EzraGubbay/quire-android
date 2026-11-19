@@ -192,3 +192,12 @@ abstract class DownloadDao {
     @Query("DELETE FROM downloads")
     abstract suspend fun deleteAll()
 }
+
+@Dao
+abstract class ReadingPositionDao {
+    @Query("SELECT * FROM reading_positions WHERE fileId = :fileId")
+    abstract suspend fun get(fileId: String): ReadingPositionEntity?
+
+    @Upsert
+    abstract suspend fun upsert(position: ReadingPositionEntity)
+}

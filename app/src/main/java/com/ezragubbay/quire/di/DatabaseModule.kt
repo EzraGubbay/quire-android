@@ -46,6 +46,9 @@ object DatabaseModule {
     fun downloadDao(db: QuireDatabase) = db.downloadDao()
 
     @Provides
+    fun readingPositionDao(db: QuireDatabase) = db.readingPositionDao()
+
+    @Provides
     fun browseApi(client: QuireClient): BrowseApi = client
 
     @Provides

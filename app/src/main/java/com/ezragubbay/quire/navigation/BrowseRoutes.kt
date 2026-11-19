@@ -11,3 +11,10 @@ data class CourseRoute(
 /** Full-screen search; pushed over the shell from the Courses top bar. */
 @Serializable
 data object SearchRoute
+
+/** The PDF viewer for [fileId] of course [courseSlug]; pushed over the shell (open-file flow, #38, targets it). */
+@Serializable
+data class ViewerRoute(
+    val courseSlug: String,
+    val fileId: String,
+)

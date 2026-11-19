@@ -104,4 +104,12 @@
     <string name="files_format_pdf">PDF</string>
     <string name="files_format_original">Original</string>
     <string name="files_format_markdown">Markdown</string>
+    <string name="viewer_back">Back</string>
+    <string name="viewer_title">Document</string>
+    <string name="viewer_jump">Go to page</string>
+    <string name="viewer_jump_confirm">Go</string>
+    <string name="viewer_jump_hint">Page number</string>
+    <string name="viewer_loading">Preparing document</string>
+    <string name="viewer_error">Could not open this document.</string>
+    <string name="viewer_retry">Retry</string>
 </resources>
