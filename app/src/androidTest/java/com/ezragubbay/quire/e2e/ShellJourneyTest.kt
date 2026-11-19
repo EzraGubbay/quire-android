@@ -18,8 +18,9 @@ import org.junit.runner.RunWith
 
 /**
  * Epic e2e journey for QMOB-E2 (app shell). Defined before any shell story is implemented
- * (QMOB-E2-S0, #16): every case ships `@Ignore("QMOB-E2")` and is un-ignored by the story that
- * satisfies it. The epic is done when no `@Ignore("QMOB-E2")` remains here.
+ * (QMOB-E2-S0, #16): every case ships Ignored (reason QMOB-E2) and is un-ignored by the story that
+ * satisfies it. The epic is done when no such Ignore remains here. (This KDoc deliberately avoids
+ * the literal annotation text so the release-gate grep only matches real annotations, not this note.)
  *
  * The journey finds UI by **test tag only** (the contract in `docs/e2e/E2-shell.md`), never by
  * display text, and runs against [MockWebServer][okhttp3.mockwebserver.MockWebServer] fixtures.
