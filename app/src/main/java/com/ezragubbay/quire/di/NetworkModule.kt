@@ -1,6 +1,8 @@
 package com.ezragubbay.quire.di
 
 import com.ezragubbay.quire.BuildConfig
+import com.ezragubbay.quire.core.network.ChatApi
+import com.ezragubbay.quire.core.network.ChatStreamApi
 import com.ezragubbay.quire.core.network.ContentApi
 import com.ezragubbay.quire.core.network.NetworkOptions
 import com.ezragubbay.quire.core.network.QuireClient
@@ -43,6 +45,36 @@ object NetworkModule {
             tokens = tokens,
             events = events,
             options = NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+        )
+
+    @Provides
+    @Singleton
+    fun chatStreamApi(
+        config: ServerConfigProvider,
+        tokens: TokenCache,
+        events: SessionEvents,
+    ): ChatStreamApi =
+        QuireClientFactory.chatStreamApi(
+            config = config,
+            tokens = tokens,
+            events = events,
+            options = NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+        )
+
+    @Provides
+    @Singleton
+    fun chatApi(
+        config: ServerConfigProvider,
+        tokens: TokenCache,
+        events: SessionEvents,
+    ): ChatApi =
+        QuireClientFactory.chatApi(
+            QuireClientFactory.okHttpClient(
+                config,
+                tokens,
+                events,
+                NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+            ),
         )
 
     @Provides
