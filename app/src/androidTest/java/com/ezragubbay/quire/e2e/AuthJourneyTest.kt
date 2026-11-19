@@ -140,7 +140,8 @@ class AuthJourneyTest {
         launch()
         pair()
 
-        composeRule.onNodeWithTag("pair-error").assertIsDisplayed()
+        // The error renders below the form, which scrolls under the soft keyboard: bring it into view.
+        composeRule.onNodeWithTag("pair-error").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("screen-pair").assertIsDisplayed()
         composeRule.onNodeWithTag("app-root").assertDoesNotExist()
     }
@@ -174,7 +175,9 @@ class AuthJourneyTest {
         composeRule.onNodeWithTag("action-settings").performClick()
         composeRule.onNodeWithTag("settings-account").assertIsDisplayed()
         server.server.enqueue(MockResponse().setResponseCode(204))
-        composeRule.onNodeWithTag("action-sign-out").performClick()
+        // Settings scrolls and Sign out sits below the fold on the CI emulator: scroll it into view or the
+        // click lands off-screen and is a silent no-op.
+        composeRule.onNodeWithTag("action-sign-out").performScrollTo().performClick()
 
         // Sign-out is async (revoke token → clear session → flip state → navigate): wait for Pair.
         composeRule.waitUntil(PAIR_TIMEOUT_MS) {
