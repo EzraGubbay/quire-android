@@ -71,6 +71,43 @@ object QuireClientFactory {
             ).build()
             .create(ContentApi::class.java)
 
+    /**
+     * Streaming client for chat answers: no overall call timeout (an answer may take minutes) but a read timeout of
+     * [idleMillis], which acts as the idle watchdog: that long without bytes fails the read with an I/O error.
+     */
+    fun chatStreamApi(
+        config: ServerConfigProvider,
+        tokens: TokenProvider,
+        events: SessionEvents,
+        options: NetworkOptions,
+        idleMillis: Long = CHAT_IDLE_MILLIS,
+    ): ChatStreamApi =
+        Retrofit
+            .Builder()
+            .baseUrl(PLACEHOLDER_BASE)
+            .callFactory(
+                okHttpClient(config, tokens, events, options)
+                    .newBuilder()
+                    .callTimeout(0, TimeUnit.MILLISECONDS)
+                    .readTimeout(idleMillis, TimeUnit.MILLISECONDS)
+                    .build(),
+            ).addConverterFactory(QuireJson.asConverterFactory("application/json".toMediaType()))
+            .build()
+            .create(ChatStreamApi::class.java)
+
+    const val CHAT_IDLE_MILLIS = 60_000L
+
+    fun chatApi(client: Call.Factory): ChatApi =
+        ChatClient(
+            Retrofit
+                .Builder()
+                .baseUrl(PLACEHOLDER_BASE)
+                .callFactory(client)
+                .addConverterFactory(QuireJson.asConverterFactory("application/json".toMediaType()))
+                .build()
+                .create(ChatRestApi::class.java),
+        )
+
     fun create(
         config: ServerConfigProvider,
         tokens: TokenProvider,
