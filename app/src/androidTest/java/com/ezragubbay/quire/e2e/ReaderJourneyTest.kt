@@ -31,7 +31,6 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -322,7 +321,6 @@ class ReaderJourneyTest {
     // --- Share / save a copy: un-ignored by QMOB-E5-S5 (#40) ------------------------------------
 
     // un-ignored by QMOB-E5-S5 (#40)
-    @Ignore("QMOB-E5")
     @Test
     fun viewer_offersShareAndSaveCopy_forDownloadedFile() {
         enqueueReaderBundle()

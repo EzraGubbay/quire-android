@@ -123,6 +123,11 @@
     <string name="viewer_download_failed">Download failed</string>
     <string name="viewer_original_only">This file has no preview. Open it in another app.</string>
     <string name="viewer_open_with">Open with…</string>
+    <string name="viewer_share">Share</string>
+    <string name="viewer_save_copy">Save a copy</string>
+    <string name="viewer_share_failed">Nothing can receive this file.</string>
+    <string name="viewer_save_copy_done">Saved a copy.</string>
+    <string name="viewer_save_copy_failed">Could not save a copy.</string>
     <string name="viewer_no_app">No app installed can open this type of file.</string>
     <string name="downloads_empty_title">No downloads yet</string>
     <string name="downloads_empty_message">Files you save for offline reading appear here.</string>
