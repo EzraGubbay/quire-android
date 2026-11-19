@@ -1,0 +1,44 @@
+[
+  {
+    "fileId": "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10",
+    "title": "Lecture 1 - Convolution",
+    "type": "lecture",
+    "session": {
+      "number": 1,
+      "title": "Lecture 1"
+    },
+    "pageCount": 42,
+    "sizeBytes": 1048576,
+    "hasPdf": true,
+    "hasOriginal": true,
+    "hasMarkdown": false,
+    "updatedAt": "2026-10-26T09:30:00Z"
+  },
+  {
+    "fileId": "7a2d3b63-9c1f-4d7b-ae74-3b4b8d2eaf21",
+    "title": "Recitation 1 - Fourier Series",
+    "type": "recitation",
+    "session": {
+      "number": 1,
+      "title": "Recitation 1"
+    },
+    "pageCount": 10,
+    "sizeBytes": 262144,
+    "hasPdf": true,
+    "hasOriginal": true,
+    "hasMarkdown": false,
+    "updatedAt": "2026-10-28T11:00:00Z"
+  },
+  {
+    "fileId": "9c4f5d85-ba3f-4f9d-cf96-5d6daf40cb43",
+    "title": "Homework 2",
+    "type": "homework",
+    "folder": "Homework",
+    "pageCount": 4,
+    "sizeBytes": 204800,
+    "hasPdf": true,
+    "hasOriginal": false,
+    "hasMarkdown": false,
+    "updatedAt": "2026-11-02T09:30:00Z"
+  }
+]
