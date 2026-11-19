@@ -6,6 +6,7 @@ import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.QuireClientFactory
 import com.ezragubbay.quire.core.network.ServerConfigProvider
 import com.ezragubbay.quire.core.network.SessionEvents
+import com.ezragubbay.quire.core.network.TokenCache
 import com.ezragubbay.quire.core.network.TokenProvider
 import dagger.Module
 import dagger.Provides
@@ -24,11 +25,16 @@ object NetworkModule {
     @Singleton
     fun sessionEvents(): SessionEvents = SessionEvents()
 
+    /** Inject this to call `invalidate()` on sign-out or after pairing a new token. */
+    @Provides
+    @Singleton
+    fun tokenCache(tokens: TokenProvider): TokenCache = TokenCache(tokens)
+
     @Provides
     @Singleton
     fun quireClient(
         config: ServerConfigProvider,
-        tokens: TokenProvider,
+        tokens: TokenCache,
         events: SessionEvents,
     ): QuireClient =
         QuireClientFactory.create(

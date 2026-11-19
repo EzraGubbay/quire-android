@@ -31,7 +31,7 @@ object QuireClientFactory {
             .connectTimeout(options.timeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(options.timeoutMillis, TimeUnit.MILLISECONDS)
             .addInterceptor(BaseUrlInterceptor(config, options.allowCleartextLocal))
-            .addInterceptor(AuthInterceptor(tokens, events))
+            .addInterceptor(AuthInterceptor(tokens as? TokenCache ?: TokenCache(tokens), events))
             .apply {
                 if (options.debugLogging) {
                     // Headers only (no bodies); Authorization is redacted so the token never reaches logcat.
