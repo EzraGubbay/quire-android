@@ -2,6 +2,7 @@ package com.ezragubbay.quire.e2e
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
@@ -10,10 +11,10 @@ import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -116,13 +117,20 @@ class CoursesJourneyTest {
         awaitTag("course-list")
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
         takeCoursesRequest() // the first GET /courses on launch
+        // Let the launch refresh settle: while it is in flight the pull-to-refresh is "busy" and drops the drag.
+        composeRule.waitForIdle()
 
         // Pull-to-refresh issues a second GET /courses and upserts the cache.
         enqueueCourses()
-        // Start inside the node (not on its top edge, where the injected gesture never reaches the pull handler).
-        composeRule
-            .onNodeWithTag("courses-refresh")
-            .performTouchInput { swipeDown(startY = height * 0.1f, endY = height * 0.8f, durationMillis = 500) }
+        // A synthesised swipeDown ends with a fling velocity the pull handler can consume before release, so the
+        // refetch never fires on the emulator. Drive a deliberate drag instead: press near the top, step the finger
+        // well past the refresh threshold, then release with no trailing velocity, so onRefresh fires exactly once.
+        composeRule.onNodeWithTag("courses-refresh").performTouchInput {
+            down(Offset(centerX, top + 4f))
+            val step = (height * 0.8f) / PULL_STEPS
+            repeat(PULL_STEPS) { moveBy(Offset(0f, step)) }
+            up()
+        }
 
         val refresh = takeCoursesRequest()
         assertTrue("Pull-to-refresh must GET /courses again", refresh.path!!.endsWith("/courses"))
@@ -237,9 +245,12 @@ class CoursesJourneyTest {
         openSignalsCourse()
         composeRule.onNodeWithTag("tab-files").performClick()
 
-        // Each file row carries a type-label chip; a sort control is available.
+        // Each file row carries a type-label chip; a sort control is available. The first row sits low under the
+        // collapsing title + tabs + filter bar on the CI emulator, so its chip can start below the fold: scroll
+        // the file list to bring it fully on-screen before asserting (the sort control stays pinned above the list).
         composeRule
             .onAllNodesWithTag("file-type-chip")[0]
+            .performScrollTo()
             .assertIsDisplayed()
         composeRule.onNodeWithTag("sort-control").assertIsDisplayed()
     }
@@ -266,8 +277,11 @@ class CoursesJourneyTest {
         enqueueCourseDetail() // search is served from Room after one successful sync, offline-capable
         launch()
         openSignalsCourse()
-        // Return to Courses so the search action is in scope, then open full-screen search.
-        composeRule.onNodeWithTag("nav-courses").performClick()
+        // Return to Courses so the search action is in scope, then open full-screen search. The course screen
+        // hides the shell chrome (no bottom bar), so leave it via its top-bar back arrow rather than nav-courses
+        // (which does not exist here); the bottom bar and the Courses search action return once back on the list.
+        composeRule.onNodeWithTag("top-bar-back").performClick()
+        awaitTag("action-search")
         composeRule.onNodeWithTag("action-search").performClick()
         composeRule.onNodeWithTag("screen-search").assertIsDisplayed()
 
@@ -331,6 +345,7 @@ class CoursesJourneyTest {
 
     private companion object {
         const val TIMEOUT_MS = 10_000L
+        const val PULL_STEPS = 8
         const val LECTURE_FILE_ID = "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
         const val RECITATION_FILE_ID = "7a2d3b63-9c1f-4d7b-ae74-3b4b8d2eaf21"
         const val LECTURE_NOTE_ID = "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"

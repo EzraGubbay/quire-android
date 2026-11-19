@@ -1,5 +1,7 @@
 package com.ezragubbay.quire.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,7 +74,19 @@ fun QuireApp(
         }
     }
 
-    NavHost(navController = navController, startDestination = if (isSignedIn) ShellRoute else PairRoute()) {
+    NavHost(
+        navController = navController,
+        startDestination = if (isSignedIn) ShellRoute else PairRoute(),
+        // Switch the auth gate (Pair <-> shell) instantly. The default fade keeps the outgoing destination
+        // composed for the length of the animation; on session expiry that let the shell's nested NavHost
+        // recompose a route-scoped screen (e.g. Courses) and re-resolve its hiltViewModel() AFTER the popped
+        // NavBackStackEntry was destroyed, crashing with "cannot access ... ViewModels after ... destroyed".
+        // With no exit transition the shell subtree is disposed in one pass, so nothing touches the dead entry.
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
+    ) {
         composable<PairRoute>(
             deepLinks = listOf(navDeepLink<PairRoute>(basePath = DEEP_LINK_BASE)),
         ) { entry ->
