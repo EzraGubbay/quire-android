@@ -15,7 +15,10 @@ internal fun relativeLuminance(color: Color): Double {
     return 0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue)
 }
 
-internal fun contrastRatio(a: Color, b: Color): Double {
+internal fun contrastRatio(
+    a: Color,
+    b: Color,
+): Double {
     val la = relativeLuminance(a)
     val lb = relativeLuminance(b)
     return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)

@@ -52,8 +52,12 @@ class FileTypeAccentTest {
     fun lightAndDarkAccentsDiffer() {
         for (type in FileType.entries) {
             assertNotEquals(
-                QuireColors.Light.fileAccents.getValue(type).color,
-                QuireColors.Dark.fileAccents.getValue(type).color,
+                QuireColors.Light.fileAccents
+                    .getValue(type)
+                    .color,
+                QuireColors.Dark.fileAccents
+                    .getValue(type)
+                    .color,
             )
         }
     }
