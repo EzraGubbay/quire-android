@@ -120,3 +120,14 @@ data class ReadingPositionEntity(
     val page: Int,
     val updatedAt: Long,
 )
+
+/** One cached chat thread (global recent list and per-course lists). No FK: threads can be cached before courses. */
+@Entity(tableName = "threads", indices = [Index("courseSlug")])
+data class ThreadEntity(
+    @PrimaryKey val id: String,
+    val courseSlug: String,
+    val title: String,
+    val documentId: String?,
+    val createdAt: String,
+    val updatedAt: String,
+)

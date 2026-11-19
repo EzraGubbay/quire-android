@@ -29,6 +29,8 @@ import com.ezragubbay.quire.APP_ROOT_TAG
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
+import com.ezragubbay.quire.feature.chat.conversation.ConversationPlaceholder
+import com.ezragubbay.quire.feature.chat.threads.CourseThreadsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
@@ -59,7 +61,9 @@ fun AppShell(
             destination?.hasRoute<CourseRoute>() == true ||
             destination?.hasRoute<SearchRoute>() == true ||
             destination?.hasRoute<ViewerRoute>() == true ||
-            destination?.hasRoute<NoteReaderRoute>() == true
+            destination?.hasRoute<NoteReaderRoute>() == true ||
+            destination?.hasRoute<CourseThreadsRoute>() == true ||
+            destination?.hasRoute<ConversationRoute>() == true
     val current = TopLevelDestination.entries.firstOrNull { destination?.hasRoute(it.route::class) == true }
 
     Scaffold(
@@ -118,8 +122,17 @@ fun AppShell(
                     onBack = { navController.popBackStack() },
                     onOpenFile = { navController.navigate(ViewerRoute(slug, it)) },
                     onOpenNote = { navController.navigate(NoteReaderRoute(slug, it)) },
+                    onAsk = { navController.navigate(CourseThreadsRoute(slug)) },
                 )
             }
+            composable<CourseThreadsRoute> {
+                CourseThreadsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) },
+                )
+            }
+            // E6-S2 skeleton: the real conversation screen (E6-S3) replaces this placeholder destination.
+            composable<ConversationRoute> { ConversationPlaceholder(onBack = { navController.popBackStack() }) }
             composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
             composable<NoteReaderRoute> { NoteReaderScreen(onBack = { navController.popBackStack() }) }
             composable<SearchRoute> {
@@ -129,7 +142,9 @@ fun AppShell(
                 )
             }
             composable<DownloadsRoute> { DownloadsScreen() }
-            composable<ChatsRoute> { ChatsScreen() }
+            composable<ChatsRoute> {
+                ChatsScreen(onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) })
+            }
             composable<SettingsRoute> {
                 SettingsScreen(
                     account = account,
