@@ -9,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -62,8 +61,8 @@ class SettingsViewModelTest {
             vm.onThemeModeSelected(ThemeMode.Dark)
             assertEquals(ThemeMode.Dark, vm.settings.value.themeMode)
 
-            advanceUntilIdle()
-            assertEquals(ThemeMode.Dark, repo.settings.first().themeMode)
+            // DataStore writes on a real IO thread; wait for the persisted value to appear.
+            assertEquals(ThemeMode.Dark, repo.settings.first { it.themeMode == ThemeMode.Dark }.themeMode)
         }
 
     @Test
@@ -76,7 +75,6 @@ class SettingsViewModelTest {
             vm.onUseDeviceColorsChanged(true)
             assertTrue(vm.settings.value.useDeviceColors)
 
-            advanceUntilIdle()
-            assertTrue(repo.settings.first().useDeviceColors)
+            assertTrue(repo.settings.first { it.useDeviceColors }.useDeviceColors)
         }
 }

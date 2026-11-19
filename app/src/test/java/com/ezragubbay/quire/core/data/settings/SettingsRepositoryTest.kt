@@ -57,9 +57,11 @@ class SettingsRepositoryTest {
     fun settings_surviveANewRepositoryOverTheSameFile() =
         runBlocking {
             val file = tmp.newFile("again.preferences_pb").also { it.delete() }
-            repo(file).setThemeMode(ThemeMode.Light)
-            val reopened =
-                SettingsRepository(PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) { file })
+            val firstScope = CoroutineScope(Dispatchers.IO)
+            SettingsRepository(PreferenceDataStoreFactory.create(scope = firstScope) { file })
+                .setThemeMode(ThemeMode.Light)
+            firstScope.cancel()
+            val reopened = repo(file)
             assertEquals(ThemeMode.Light, reopened.settings.first().themeMode)
         }
 
