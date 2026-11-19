@@ -53,6 +53,24 @@ object QuireClientFactory {
             .build()
             .create(QuireApi::class.java)
 
+    /** Streaming client for downloads: same interceptors, but no overall call timeout (reads still time out). */
+    fun contentApi(
+        config: ServerConfigProvider,
+        tokens: TokenProvider,
+        events: SessionEvents,
+        options: NetworkOptions,
+    ): ContentApi =
+        Retrofit
+            .Builder()
+            .baseUrl(PLACEHOLDER_BASE)
+            .callFactory(
+                okHttpClient(config, tokens, events, options)
+                    .newBuilder()
+                    .callTimeout(0, TimeUnit.MILLISECONDS)
+                    .build(),
+            ).build()
+            .create(ContentApi::class.java)
+
     fun create(
         config: ServerConfigProvider,
         tokens: TokenProvider,

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temporary stream-to-cache files (originals handed to other apps via Open with...). -->
+    <cache-path name="viewer" path="viewer/" />
+    <!-- Persisted downloads. -->
+    <files-path name="downloads" path="downloads/" />
+</paths>

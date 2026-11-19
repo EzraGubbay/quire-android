@@ -139,7 +139,7 @@ Open questions:
 
 **Epic e2e / integration tests (defined first).** `ReaderJourneyTest` (QMOB-E5-S0): open a lecture deck → page indicator → scroll → reopen resumes the page → download → works with the server down → Downloads tab lists it → remove.
 
-**Done when.** No `@Ignore("QMOB-E5")` remains; 300-page stress test passes without OOM; ADR 0001 merged.
+**Done when.** No `@Ignore("QMOB-E5")` remains; 300-page stress test passes without OOM; ADR 0002 merged.
 
 **Out of scope.** Annotations/highlights, text selection or in-PDF search, in-app PPTX/Keynote rendering, note editing.
 

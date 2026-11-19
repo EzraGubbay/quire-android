@@ -8,7 +8,7 @@ import java.io.IOException
 /** Typed entry point to the mobile API: every call returns an [ApiResult] and never throws. */
 class QuireClient(
     private val api: QuireApi,
-) {
+) : BrowseApi {
     suspend fun pair(
         code: String,
         deviceName: String,
@@ -17,13 +17,41 @@ class QuireClient(
     suspend fun me(): ApiResult<MeResponse> = apiCall { api.me() }
 
     suspend fun revokeToken(): ApiResult<Unit> = apiCall { api.revokeToken() }
+
+    override suspend fun courses(): ApiResult<List<CourseSummaryDto>> = apiCall(requireBody = true) { api.courses() }
+
+    override suspend fun course(slug: String): ApiResult<CourseDetailDto> =
+        apiCall(requireBody = true) { api.course(slug) }
+
+    override suspend fun sessions(slug: String): ApiResult<List<CourseSessionDto>> =
+        apiCall(requireBody = true) {
+            api.sessions(slug)
+        }
+
+    override suspend fun files(slug: String): ApiResult<List<CourseFileDto>> =
+        apiCall(requireBody = true) {
+            api.files(slug)
+        }
+
+    override suspend fun notes(slug: String): ApiResult<List<NoteDto>> = apiCall(requireBody = true) { api.notes(slug) }
+
+    override suspend fun note(
+        slug: String,
+        noteId: String,
+    ): ApiResult<NoteDetailDto> = apiCall(requireBody = true) { api.note(slug, noteId) }
 }
 
-/** Runs [call] and maps the response, error envelope and exceptions into an [ApiResult]. */
+/**
+ * Runs [call] and maps the response, error envelope and exceptions into an [ApiResult]. With [requireBody], a 2xx with
+ * no body (e.g. a 204) is a [ApiResult.Failure.Unknown] instead of a bogus `Unit` success for a non-Unit `T`.
+ */
 @Suppress("TooGenericExceptionCaught")
-suspend fun <T> apiCall(call: suspend () -> Response<T>): ApiResult<T> =
+suspend fun <T> apiCall(
+    requireBody: Boolean = false,
+    call: suspend () -> Response<T>,
+): ApiResult<T> =
     try {
-        call().toApiResult()
+        call().toApiResult(requireBody)
     } catch (e: CancellationException) {
         throw e
     } catch (e: IOException) {
@@ -35,21 +63,24 @@ suspend fun <T> apiCall(call: suspend () -> Response<T>): ApiResult<T> =
         ApiResult.Failure.Unknown(message = e.message.orEmpty())
     }
 
-private fun <T> Response<T>.toApiResult(): ApiResult<T> {
-    if (isSuccessful) {
-        @Suppress("UNCHECKED_CAST")
-        return ApiResult.Success((body() ?: Unit) as T)
-    }
-    val envelope =
-        try {
-            errorBody()?.string()?.let { QuireJson.decodeFromString<ErrorEnvelope>(it).error }
-        } catch (_: SerializationException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
+private fun <T> Response<T>.toApiResult(requireBody: Boolean): ApiResult<T> =
+    when {
+        !isSuccessful -> mapError(code(), errorEnvelope())
+        requireBody && body() == null -> ApiResult.Failure.Unknown(code(), "Empty response body")
+        else -> {
+            @Suppress("UNCHECKED_CAST")
+            ApiResult.Success((body() ?: Unit) as T)
         }
-    return mapError(code(), envelope)
-}
+    }
+
+private fun <T> Response<T>.errorEnvelope(): ErrorBody? =
+    try {
+        errorBody()?.string()?.let { QuireJson.decodeFromString<ErrorEnvelope>(it).error }
+    } catch (_: SerializationException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
 
 private const val HTTP_BAD_REQUEST = 400
 private const val HTTP_UNAUTHORIZED = 401

@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "lecture",
+    "number": 1,
+    "title": "Lecture 1",
+    "date": "2026-10-26",
+    "fileIds": [
+      "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
+    ],
+    "noteId": "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"
+  },
+  {
+    "kind": "recitation",
+    "number": 1,
+    "title": "Recitation 1",
+    "date": "2026-10-28",
+    "fileIds": [
+      "7a2d3b63-9c1f-4d7b-ae74-3b4b8d2eaf21"
+    ],
+    "noteId": null
+  }
+]

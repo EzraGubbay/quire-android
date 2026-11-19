@@ -68,6 +68,21 @@ class AppViewModelTest {
             revokeCalls++
             return revoke.invoke()
         }
+
+        override suspend fun courses() = error("unused")
+
+        override suspend fun course(slug: String) = error("unused")
+
+        override suspend fun sessions(slug: String) = error("unused")
+
+        override suspend fun files(slug: String) = error("unused")
+
+        override suspend fun notes(slug: String) = error("unused")
+
+        override suspend fun note(
+            slug: String,
+            noteId: String,
+        ) = error("unused")
     }
 
     private val api = FakeApi()

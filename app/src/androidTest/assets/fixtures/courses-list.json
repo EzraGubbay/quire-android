@@ -1,0 +1,29 @@
+[
+  {
+    "slug": "signals-and-systems",
+    "id": "1b4e28ba-2fa1-41d2-883f-0016d3cca427",
+    "name": "Signals and Systems",
+    "code": "044130",
+    "semester": "Winter 2026",
+    "type": "lecture",
+    "fileCount": 12
+  },
+  {
+    "slug": "infi-1",
+    "id": "2c5f39cb-3ab2-42e3-994a-1127e4ddb538",
+    "name": "חשבון אינפיניטסימלי 1",
+    "code": "104003",
+    "semester": "Winter 2026",
+    "type": "lecture",
+    "fileCount": 8
+  },
+  {
+    "slug": "intro-to-ml",
+    "id": "3d6a40dc-4bc3-43f4-aa5b-2238f5eec649",
+    "name": "Introduction to Machine Learning",
+    "code": "236756",
+    "semester": "Spring 2026",
+    "type": "lecture",
+    "fileCount": 7
+  }
+]

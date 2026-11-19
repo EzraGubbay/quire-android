@@ -20,11 +20,13 @@ interface SessionTestEntryPoint {
 
 /**
  * Puts the persisted session into a known state before the activity launches: [signedIn] seeds a paired
- * session, otherwise the install is fresh. Must run after `HiltAndroidRule` (it uses the Hilt graph) and before
+ * session at [serverUrl], otherwise the install is fresh. Must run after `HiltAndroidRule` (it uses the Hilt graph) and before
  * the compose/activity rule. The DataStore file outlives a test, so every test seeds explicitly.
  */
 class SessionSeedRule(
     private val signedIn: Boolean,
+    /** Server URL for the seeded session; resolved lazily so it can be a started `MockWebServerRule`'s base URL. */
+    private val serverUrl: () -> String = { "https://seeded.example.com" },
 ) : ExternalResource() {
     override fun before() {
         val entry =
@@ -34,7 +36,7 @@ class SessionSeedRule(
             )
         runBlocking {
             if (signedIn) {
-                entry.sessions().signIn("https://seeded.example.com", "seed-token", "tester", "Test device")
+                entry.sessions().signIn(serverUrl(), "seed-token", "tester", "Test device")
             } else {
                 entry.sessions().signOut()
             }

@@ -1,9 +1,13 @@
 package com.ezragubbay.quire.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
@@ -72,7 +76,19 @@ fun QuireApp(
         }
     }
 
-    NavHost(navController = navController, startDestination = if (isSignedIn) ShellRoute else PairRoute()) {
+    NavHost(
+        navController = navController,
+        startDestination = if (isSignedIn) ShellRoute else PairRoute(),
+        // Switch the auth gate (Pair <-> shell) instantly. The default fade keeps the outgoing destination
+        // composed for the length of the animation; on session expiry that let the shell's nested NavHost
+        // recompose a route-scoped screen (e.g. Courses) and re-resolve its hiltViewModel() AFTER the popped
+        // NavBackStackEntry was destroyed, crashing with "cannot access ... ViewModels after ... destroyed".
+        // With no exit transition the shell subtree is disposed in one pass, so nothing touches the dead entry.
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
+    ) {
         composable<PairRoute>(
             deepLinks = listOf(navDeepLink<PairRoute>(basePath = DEEP_LINK_BASE)),
         ) { entry ->
@@ -96,8 +112,19 @@ fun QuireApp(
                 onBack = { navController.popBackStack() },
             )
         }
-        composable<ShellRoute> {
-            AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
+        composable<ShellRoute> { entry ->
+            // On sign-out / expiry the root pops this entry and routes to Pair. Navigation can still recompose the
+            // popped destination's content for a frame; if it does, the shell's nested NavHost would re-run its
+            // route-scoped screen (e.g. Courses) and re-resolve its hiltViewModel() on the now-destroyed
+            // NavBackStackEntry, crashing with "cannot access ... ViewModels after ... destroyed". Gating on the
+            // entry's own lifecycle means the shell (and its nested graph) is never composed once the entry is dead.
+            val lifecycleState by entry.lifecycle.currentStateAsState()
+            // Also gate on isSignedIn: it flips in the same composition pass that observes sign-out / expiry, so
+            // the shell is disposed BEFORE the LaunchedEffect below pops (and destroys) its entry. That closes the
+            // race where a nested screen recomposed (e.g. on the 401 that expired the session) on a dead entry.
+            if (isSignedIn && lifecycleState != Lifecycle.State.DESTROYED) {
+                AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
+            }
         }
     }
 }
