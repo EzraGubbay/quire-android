@@ -64,7 +64,7 @@ open-file (#38) decides disk-vs-stream and routes Markdown to the notes reader a
 8. **Originals.** A file with only an original (`hasOriginal && !hasPdf`) offers `action-open-with`
    (`ACTION_VIEW` with the right MIME type); when no app can open it, an explanatory message shows.
 9. **Notes reader.** A `note-row-{noteId}` opens `screen-note-reader`, rendering the Markdown
-   (`note-markdown`) read-only, with block/inline math (`note-math`) per ADR 0001; RTL-aware, themed,
+   (`note-markdown`) read-only, with block/inline math (`note-math`) per ADR 0002; RTL-aware, themed,
    cached offline.
 
 ## Test-tag contract
@@ -123,7 +123,7 @@ states.
 |---|---|
 | `screen-note-reader` | Root of the read-only notes reader. |
 | `note-markdown` | The rendered Markdown body. |
-| `note-math` | A rendered block/inline math node (per ADR 0001, the #41 spike). |
+| `note-math` | A rendered block/inline math node (per ADR 0002, the #41 spike). |
 
 Inherited from earlier epics: `nav-downloads` / `screen-downloads` (E2), `screen-course`,
 `course-tabs`, `tab-files` / `tab-notes`, `file-list`, `file-row-{fileId}`, `session-deck-{fileId}`,
