@@ -4,7 +4,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 object ServerUrl {
-    private val localHosts = setOf("localhost", "127.0.0.1", "10.0.2.2", "[::1]")
+    private val localHosts = setOf("localhost", "127.0.0.1", "10.0.2.2", "::1")
 
     /** HTTPS always; cleartext only for emulator/localhost hosts and only when [allowCleartextLocal] (debug). */
     fun isAllowed(

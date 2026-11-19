@@ -140,6 +140,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
