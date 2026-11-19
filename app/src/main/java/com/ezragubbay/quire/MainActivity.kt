@@ -12,12 +12,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
 
 const val APP_ROOT_TAG = "app-root"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {

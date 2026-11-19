@@ -39,7 +39,7 @@ class AppIconResourcesTest {
     @Test
     fun adaptiveIconsDeclareForegroundBackgroundAndMonochrome() {
         listOf("ic_launcher.xml", "ic_launcher_round.xml").forEach { name ->
-            val root = parse(File(res, "mipmap-anydpi-v26/$name")).documentElement
+            val root = parse(File(res, "mipmap-anydpi/$name")).documentElement
             assertEquals(name, "adaptive-icon", root.tagName)
             assertEquals("@color/ic_launcher_background", androidAttr(childElement(root, "background"), "drawable"))
             assertEquals("@drawable/ic_launcher_foreground", androidAttr(childElement(root, "foreground"), "drawable"))
@@ -68,7 +68,7 @@ class AppIconResourcesTest {
 
     @Test
     fun licenseShippedWithBundledFonts() {
-        assertTrue(File(res, "font/OFL.txt").readText().contains("SIL OPEN FONT LICENSE Version 1.1"))
+        assertTrue(File("src/main/assets/fonts/OFL.txt").readText().contains("SIL OPEN FONT LICENSE Version 1.1"))
     }
 
     private fun childElement(
@@ -82,13 +82,15 @@ class AppIconResourcesTest {
 
     private fun splashStyle(file: File): Element {
         val styles = parse(file).getElementsByTagName("style")
-        return (0 until styles.length).map { styles.item(it) as Element }
+        return (0 until styles.length)
+            .map { styles.item(it) as Element }
             .single { it.getAttribute("name") == "Theme.Quire.Starting" }
     }
 
     private fun itemsByName(style: Element): Map<String, String> {
         val items = style.getElementsByTagName("item")
-        return (0 until items.length).map { items.item(it) as Element }
+        return (0 until items.length)
+            .map { items.item(it) as Element }
             .associate { it.getAttribute("name") to it.textContent.trim() }
     }
 }
