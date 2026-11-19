@@ -14,8 +14,14 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Configuration
+import androidx.work.ListenableWorker
+import androidx.work.WorkManager
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.core.database.QuireDatabase
+import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -87,15 +93,24 @@ class ReaderJourneyTest {
 
     @Inject lateinit var db: QuireDatabase
 
+    @Inject lateinit var workerFactory: DownloadWorkerFactory
+
     private var scenario: ActivityScenario<MainActivity>? = null
 
     /** Each case starts with no persisted downloads and an empty viewer cache (state survives between cases). */
     @Before
     fun resetOfflineState() {
         hilt.inject()
+        // HiltTestApplication is not a WorkManager Configuration.Provider, so wire the download worker factory here.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        // WorkManager initialises once per process, but each case has a fresh Hilt graph (and Room instance), so the
+        // factory it holds delegates to the current case's factory.
+        currentWorkerFactory = workerFactory
+        runCatching {
+            WorkManager.initialize(context, Configuration.Builder().setWorkerFactory(DelegatingWorkerFactory).build())
+        } // already initialised by an earlier case in this process
         // Direct DAO/file reset: going through DownloadRepository would touch WorkManager before the app starts.
         runBlocking { db.downloadDao().deleteAll() }
-        val context = ApplicationProvider.getApplicationContext<Context>()
         context.cacheDir.resolve("viewer").deleteRecursively()
         context.filesDir.resolve("downloads").deleteRecursively()
     }
@@ -436,7 +451,17 @@ class ReaderJourneyTest {
         }
     }
 
+    private object DelegatingWorkerFactory : WorkerFactory() {
+        override fun createWorker(
+            appContext: Context,
+            workerClassName: String,
+            workerParameters: WorkerParameters,
+        ): ListenableWorker? = currentWorkerFactory?.createWorker(appContext, workerClassName, workerParameters)
+    }
+
     private companion object {
+        @Volatile var currentWorkerFactory: DownloadWorkerFactory? = null
+
         const val TIMEOUT_MS = 10_000L
         const val DECK_PDF = "lecture-1.pdf"
         const val LECTURE_FILE_ID = "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
