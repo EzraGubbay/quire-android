@@ -4,15 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
+import com.ezragubbay.quire.navigation.AppShell
 
 const val APP_ROOT_TAG = "app-root"
 
@@ -22,20 +15,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             QuireTheme {
-                AppRoot()
+                AppShell()
             }
-        }
-    }
-}
-
-@Composable
-fun AppRoot() {
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier.fillMaxSize().testTag(APP_ROOT_TAG),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "Quire")
         }
     }
 }
