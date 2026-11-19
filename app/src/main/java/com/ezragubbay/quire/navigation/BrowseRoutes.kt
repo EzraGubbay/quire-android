@@ -19,12 +19,6 @@ data class CourseRoute(
 @Serializable
 data object SearchRoute
 
-/** Placeholder destination, replaced by the real course screen (QMOB-E4-S3). */
-@Composable
-internal fun CoursePlaceholder(slug: String) {
-    Box(Modifier.fillMaxSize().testTag("screen-course"), contentAlignment = Alignment.Center) { Text(slug) }
-}
-
 /** Placeholder destination, replaced by the real search screen (QMOB-E4-S5). */
 @Composable
 internal fun SearchPlaceholder() {

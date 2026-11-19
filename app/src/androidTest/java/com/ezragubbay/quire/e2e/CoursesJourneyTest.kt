@@ -157,7 +157,6 @@ class CoursesJourneyTest {
     // --- Course screen tabs: un-ignored by QMOB-E4-S3 (#32) -------------------------------------
 
     // un-ignored by QMOB-E4-S3 (#32)
-    @Ignore("QMOB-E4")
     @Test
     fun tapCourseCard_opensCourse_onSessionsTab_showsLectureOneWithDeck() {
         enqueueCourses()
@@ -177,7 +176,6 @@ class CoursesJourneyTest {
     }
 
     // un-ignored by QMOB-E4-S3 (#32)
-    @Ignore("QMOB-E4")
     @Test
     fun courseScreen_exposesSessionsFilesNotesTabs() {
         enqueueCourses()
@@ -197,7 +195,6 @@ class CoursesJourneyTest {
     }
 
     // un-ignored by QMOB-E4-S3 (#32)
-    @Ignore("QMOB-E4")
     @Test
     fun courseScreen_notesTab_listsCachedNotes() {
         enqueueCourses()

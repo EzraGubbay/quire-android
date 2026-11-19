@@ -55,4 +55,22 @@
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
     </plurals>
+    <string name="course_tab_sessions">Sessions</string>
+    <string name="course_tab_files">Files</string>
+    <string name="course_tab_notes">Notes</string>
+    <string name="course_filter_lectures">Lectures</string>
+    <string name="course_filter_recitations">Recitations</string>
+    <string name="course_session_lecture">Lecture %d</string>
+    <string name="course_session_recitation">Recitation %d</string>
+    <string name="course_session_has_note">Has a note</string>
+    <string name="course_error">Couldn\'t load this course.</string>
+    <string name="course_offline">Offline \u2014 showing saved data</string>
+    <string name="course_sessions_empty">No sessions yet</string>
+    <string name="course_files_empty">No files yet</string>
+    <string name="course_notes_empty">No notes yet</string>
+    <string name="course_file_meta">%1$s \u00b7 %2$s</string>
+    <plurals name="course_page_count">
+        <item quantity="one">%d page</item>
+        <item quantity="other">%d pages</item>
+    </plurals>
 </resources>

@@ -24,11 +24,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
 import com.ezragubbay.quire.APP_ROOT_TAG
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
+import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
 import com.ezragubbay.quire.feature.settings.SettingsScreen
@@ -106,7 +106,7 @@ fun AppShell(
             composable<CoursesRoute> {
                 CoursesScreen(onOpenCourse = { navController.navigate(CourseRoute(it)) })
             }
-            composable<CourseRoute> { entry -> CoursePlaceholder(entry.toRoute<CourseRoute>().slug) }
+            composable<CourseRoute> { CourseScreen(onBack = { navController.popBackStack() }) }
             composable<SearchRoute> { SearchPlaceholder() }
             composable<DownloadsRoute> { DownloadsScreen() }
             composable<ChatsRoute> { ChatsScreen() }

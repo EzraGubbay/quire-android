@@ -24,7 +24,6 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -202,7 +201,6 @@ class CourseViewModelTest {
             source.emit()
             val content = ui() as CourseUiState.Content
             assertTrue(content.sessions.isEmpty())
-            assertNull(content.subtitle.takeIf { false })
         }
 
     private companion object {
@@ -219,12 +217,27 @@ class CourseViewModelTest {
             noteId: String? = null,
         ) = CourseSession("signals", "lecture", number, "Lecture $number", date, fileIds, noteId)
 
-        fun recitation(number: Int) = CourseSession("signals", "recitation", number, "Rec $number", null, emptyList(), null)
+        fun recitation(number: Int) =
+            CourseSession("signals", "recitation", number, "Rec $number", null, emptyList(), null)
 
         fun file(
             id: String,
             title: String = id,
-        ) = CourseFile(id, "signals", title, FileType.LECTURE, 1, null, null, 10, 100L, true, false, false, "2026-11-01T00:00:00Z")
+        ) = CourseFile(
+            id,
+            "signals",
+            title,
+            FileType.LECTURE,
+            1,
+            null,
+            null,
+            10,
+            100L,
+            true,
+            false,
+            false,
+            "2026-11-01T00:00:00Z",
+        )
 
         fun note(id: String) = CourseNote(id, "signals", "slug-$id", "Note $id", "lecture", 1, "2026-11-01T00:00:00Z")
     }
