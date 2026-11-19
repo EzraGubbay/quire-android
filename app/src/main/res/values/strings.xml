@@ -55,4 +55,14 @@
         <item quantity="one">%d file</item>
         <item quantity="other">%d files</item>
     </plurals>
+    <string name="search_field_hint">Search courses and files</string>
+    <string name="search_back">Back</string>
+    <string name="search_clear_query">Clear search</string>
+    <string name="search_section_courses">Courses</string>
+    <string name="search_section_files">Files</string>
+    <string name="search_recent_title">Recent searches</string>
+    <string name="search_recent_clear">Clear</string>
+    <string name="search_no_results">No matches</string>
+    <string name="search_no_results_message">Try a different title, course code or type.</string>
+    <string name="search_hint_empty">Search saved courses and files \u2014 works offline.</string>
 </resources>

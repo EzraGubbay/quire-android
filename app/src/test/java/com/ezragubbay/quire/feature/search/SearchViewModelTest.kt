@@ -60,7 +60,21 @@ class SearchViewModelTest {
     private fun course(slug: String) = Course(slug, "id-$slug", slug, "1", null, 0, "lecture", 0)
 
     private fun file(id: String) =
-        CourseFile(id, "c", id, FileType.LECTURE, null, null, null, null, 1L, true, false, false, "2026-11-02T09:30:00Z")
+        CourseFile(
+            id,
+            "c",
+            id,
+            FileType.LECTURE,
+            null,
+            null,
+            null,
+            null,
+            1L,
+            true,
+            false,
+            false,
+            "2026-11-02T09:30:00Z",
+        )
 
     private fun TestScope.collect(vm: SearchViewModel): () -> SearchUiState {
         var latest = vm.state.value

@@ -64,3 +64,11 @@ data class CourseNote(
     val sessionNumber: Int?,
     val updatedAt: String,
 )
+
+/** Cached courses and files matching a search query. */
+data class SearchResults(
+    val courses: List<Course>,
+    val files: List<CourseFile>,
+) {
+    val isEmpty get() = courses.isEmpty() && files.isEmpty()
+}

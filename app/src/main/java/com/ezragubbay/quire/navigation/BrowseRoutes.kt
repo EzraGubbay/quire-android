@@ -24,9 +24,3 @@ data object SearchRoute
 internal fun CoursePlaceholder(slug: String) {
     Box(Modifier.fillMaxSize().testTag("screen-course"), contentAlignment = Alignment.Center) { Text(slug) }
 }
-
-/** Placeholder destination, replaced by the real search screen (QMOB-E4-S5). */
-@Composable
-internal fun SearchPlaceholder() {
-    Box(Modifier.fillMaxSize().testTag("screen-search"), contentAlignment = Alignment.Center) { Text("Search") }
-}

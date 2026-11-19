@@ -25,6 +25,8 @@ abstract class QuireDatabase : RoomDatabase() {
 
     abstract fun noteDao(): NoteDao
 
+    abstract fun searchDao(): SearchDao
+
     companion object {
         const val VERSION = 1
         const val NAME = "quire.db"

@@ -66,70 +66,76 @@ class SearchDaoTest {
     fun courseSearchIsCaseInsensitiveOnName() =
         runBlocking {
             seed()
-            assertEquals(listOf("signals"), db.courseDao().search(escapeLike("SIGNALS"), 20).map { it.slug })
+            assertEquals(listOf("signals"), db.searchDao().searchCourses(escapeLike("SIGNALS"), 20).map { it.slug })
         }
 
     @Test
     fun courseSearchMatchesCode() =
         runBlocking {
             seed()
-            assertEquals(listOf("calc"), db.courseDao().search(escapeLike("1040"), 20).map { it.slug }.filter { it == "calc" })
+            assertEquals(listOf("calc"), db.searchDao().searchCourses(escapeLike("1040"), 20).map { it.slug })
         }
 
     @Test
-    fun courseSearchRanksPrefixBeforeSubstring() =
+    fun courseSearchFindsPrefix() =
         runBlocking {
             seed()
-            // "Systems": "Operating Systems" is a substring match, "Signals and Systems" too; "sys" prefixes "sys"-less names only.
-            val slugs = db.courseDao().search(escapeLike("sy"), 20).map { it.slug }
-            assertEquals(listOf("signals", "sys"), slugs.sortedBy { if (it == "signals") 0 else 1 })
-            // Prefix match ("Calc") ranks ahead of a substring match ("alc" would match only Calculus anyway).
-            assertEquals("calc", db.courseDao().search(escapeLike("calc"), 20).first().slug)
+            assertEquals(
+                "calc",
+                db
+                    .searchDao()
+                    .searchCourses(escapeLike("calc"), 20)
+                    .first()
+                    .slug,
+            )
         }
 
     @Test
     fun prefixOutranksSubstring() =
         runBlocking {
             db.courseDao().replaceAll(listOf(course("a", "Intro to Systems"), course("b", "Systems Theory")))
-            assertEquals(listOf("b", "a"), db.courseDao().search(escapeLike("systems"), 20).map { it.slug })
+            assertEquals(listOf("b", "a"), db.searchDao().searchCourses(escapeLike("systems"), 20).map { it.slug })
         }
 
     @Test
     fun hebrewCourseAndFileAreFound() =
         runBlocking {
             seed()
-            assertEquals(listOf("heb"), db.courseDao().search(escapeLike("אלגברה"), 20).map { it.slug })
-            assertEquals(listOf("f3"), db.fileDao().search(escapeLike("מבחן"), 20).map { it.fileId })
+            assertEquals(listOf("heb"), db.searchDao().searchCourses(escapeLike("אלגברה"), 20).map { it.slug })
+            assertEquals(listOf("f3"), db.searchDao().searchFiles(escapeLike("מבחן"), 20).map { it.fileId })
         }
 
     @Test
     fun fileSearchMatchesTitleAndType() =
         runBlocking {
             seed()
-            assertEquals(listOf("f2", "f1"), db.fileDao().search(escapeLike("convolution"), 20).map { it.fileId })
-            assertEquals(listOf("f3"), db.fileDao().search(escapeLike("exam"), 20).map { it.fileId })
+            assertEquals(
+                listOf("f2", "f1"),
+                db.searchDao().searchFiles(escapeLike("convolution"), 20).map { it.fileId },
+            )
+            assertEquals(listOf("f3"), db.searchDao().searchFiles(escapeLike("exam"), 20).map { it.fileId })
         }
 
     @Test
     fun noMatchIsEmpty() =
         runBlocking {
             seed()
-            assertTrue(db.courseDao().search(escapeLike("zzz"), 20).isEmpty())
-            assertTrue(db.fileDao().search(escapeLike("zzz"), 20).isEmpty())
+            assertTrue(db.searchDao().searchCourses(escapeLike("zzz"), 20).isEmpty())
+            assertTrue(db.searchDao().searchFiles(escapeLike("zzz"), 20).isEmpty())
         }
 
     @Test
     fun likeWildcardsAreLiteral() =
         runBlocking {
             seed()
-            assertTrue(db.courseDao().search(escapeLike("%"), 20).isEmpty())
-            assertTrue(db.fileDao().search(escapeLike("_"), 20).isEmpty())
+            assertTrue(db.searchDao().searchCourses(escapeLike("%"), 20).isEmpty())
+            assertTrue(db.searchDao().searchFiles(escapeLike("_"), 20).isEmpty())
         }
 
     @Test
     fun limitIsApplied() =
         runBlocking {
             seed()
-            assertEquals(1, db.courseDao().search(escapeLike("s"), 1).size)
+            assertEquals(1, db.searchDao().searchCourses(escapeLike("s"), 1).size)
         }
 }

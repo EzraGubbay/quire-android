@@ -3,6 +3,7 @@ package com.ezragubbay.quire.di
 import android.content.Context
 import androidx.room.Room
 import com.ezragubbay.quire.core.data.course.CourseRepository
+import com.ezragubbay.quire.core.data.course.SearchRepository
 import com.ezragubbay.quire.core.database.ALL_MIGRATIONS
 import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.network.BrowseApi
@@ -50,4 +51,8 @@ object DatabaseModule {
         db: QuireDatabase,
         api: BrowseApi,
     ): CourseRepository = CourseRepository(db, api)
+
+    @Provides
+    @Singleton
+    fun searchRepository(db: QuireDatabase): SearchRepository = SearchRepository(db)
 }
