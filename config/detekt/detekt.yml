@@ -1,0 +1,25 @@
+# Extends detekt defaults (buildUponDefaultConfig = true). Policy: zero issues allowed.
+build:
+  maxIssues: 0
+
+naming:
+  FunctionNaming:
+    # Compose: @Composable functions are PascalCase
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+
+style:
+  MaxLineLength:
+    maxLineLength: 120
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    ignoreAnnotated: ['Preview']
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+
+complexity:
+  LongParameterList:
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    ignoreAnnotated: ['Composable']
