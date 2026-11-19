@@ -50,6 +50,16 @@ class DefaultPairerTest {
         }
 
         override suspend fun revokeToken(): Response<Unit> = Response.success(Unit)
+
+        override suspend fun courses() = error("unused")
+
+        override suspend fun course(slug: String) = error("unused")
+
+        override suspend fun sessions(slug: String) = error("unused")
+
+        override suspend fun files(slug: String) = error("unused")
+
+        override suspend fun notes(slug: String) = error("unused")
     }
 
     private fun error(code: Int): Response<Nothing> =

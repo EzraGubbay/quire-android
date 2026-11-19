@@ -69,10 +69,17 @@ android {
     // The version parser lives in buildSrc (used by this script); unit tests compile it directly.
     sourceSets.getByName("test").java.srcDir(rootProject.file("buildSrc/src/main/kotlin"))
 
+    // Room schema JSON is checked in; the androidTest migration scaffold reads it as assets.
+    sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("app/schemas"))
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 kotlin {
@@ -119,6 +126,9 @@ dependencies {
     implementation(libs.retrofit.kotlinx.serialization)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
@@ -148,6 +158,7 @@ dependencies {
     // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

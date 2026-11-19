@@ -20,19 +20,36 @@ class CourseDaoTest {
     fun setUp() {
         db =
             Room
-                .inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext<Context>(), QuireDatabase::class.java)
-                .build()
+                .inMemoryDatabaseBuilder(
+                    ApplicationProvider.getApplicationContext<Context>(),
+                    QuireDatabase::class.java,
+                ).build()
     }
 
     @After
     fun tearDown() = db.close()
 
-    private fun course(slug: String) = CourseEntity(slug, "id-$slug", slug, null, "Winter 2026", semesterKey("Winter 2026"), "lecture", 0)
+    private fun course(slug: String) =
+        CourseEntity(slug, "id-$slug", slug, null, "Winter 2026", semesterKey("Winter 2026"), "lecture", 0)
 
     private fun file(
         id: String,
         slug: String,
-    ) = CourseFileEntity(id, slug, id, "lecture", null, null, null, null, 1L, true, false, false, "2026-11-02T09:30:00Z")
+    ) = CourseFileEntity(
+        id,
+        slug,
+        id,
+        "lecture",
+        null,
+        null,
+        null,
+        null,
+        1L,
+        true,
+        false,
+        false,
+        "2026-11-02T09:30:00Z",
+    )
 
     @Test
     fun deletingCourseCascadesToChildren() =

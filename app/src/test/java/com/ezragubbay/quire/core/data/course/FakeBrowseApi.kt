@@ -18,13 +18,19 @@ fun summaryDto(
     fileCount: Int = 1,
 ) = CourseSummaryDto(slug, "id-$slug", name, "0001", semester, "lecture", fileCount)
 
+fun detailDto(
+    s: CourseSummaryDto,
+    counts: CourseCountsDto,
+) = CourseDetailDto(s.slug, s.id, s.name, s.code, s.semester, s.type, s.fileCount, counts)
+
 fun fileDto(
     id: String,
     title: String = id,
     type: String = "lecture",
 ) = CourseFileDto(id, title, type, null, null, 3, 100L, true, false, false, "2026-11-02T09:30:00Z")
 
-fun sessionDto(number: Int) = CourseSessionDto("lecture", number, "Lecture $number", "2026-11-0$number", listOf("f$number"), null)
+fun sessionDto(number: Int) =
+    CourseSessionDto("lecture", number, "Lecture $number", "2026-11-0$number", listOf("f$number"), null)
 
 fun noteDto(id: String) = NoteDto(id, "slug-$id", "Note $id", null, "2026-11-02T12:00:00Z")
 
@@ -33,7 +39,7 @@ val networkDown = ApiResult.Failure.Network(IOException("no signal"))
 class FakeBrowseApi : BrowseApi {
     var courses: ApiResult<List<CourseSummaryDto>> = ApiResult.Success(emptyList())
     var detail: (String) -> ApiResult<CourseDetailDto> = { slug ->
-        ApiResult.Success(CourseDetailDto(summaryDto(slug), CourseCountsDto(mapOf("lecture" to 1), emptyMap(), 0)))
+        ApiResult.Success(detailDto(summaryDto(slug), CourseCountsDto(mapOf("lecture" to 1), emptyMap(), 0)))
     }
     var sessions: ApiResult<List<CourseSessionDto>> = ApiResult.Success(emptyList())
     var files: ApiResult<List<CourseFileDto>> = ApiResult.Success(emptyList())

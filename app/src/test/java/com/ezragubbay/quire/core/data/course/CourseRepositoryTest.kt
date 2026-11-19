@@ -7,7 +7,6 @@ import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.core.network.CourseCountsDto
-import com.ezragubbay.quire.core.network.CourseDetailDto
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -35,24 +34,29 @@ class CourseRepositoryTest {
     fun setUp() {
         db =
             Room
-                .inMemoryDatabaseBuilder(ApplicationProvider.getApplicationContext<Context>(), QuireDatabase::class.java)
-                .build()
+                .inMemoryDatabaseBuilder(
+                    ApplicationProvider.getApplicationContext<Context>(),
+                    QuireDatabase::class.java,
+                ).build()
         repo = CourseRepository(db, api) { now }
     }
 
     @After
     fun tearDown() = db.close()
 
-    private suspend fun <T> Flow<T>.firstMatching(predicate: (T) -> Boolean): T = withTimeout(TIMEOUT) { first(predicate) }
+    private suspend fun <T> Flow<T>.firstMatching(predicate: (T) -> Boolean): T =
+        withTimeout(TIMEOUT) { first(predicate) }
 
     @Test
     fun firstLoadEmitsLoadingThenSyncedWithData() =
         runBlocking {
             api.courses = ApiResult.Success(listOf(summaryDto("a"), summaryDto("b")))
+            val gate = CompletableDeferred<Unit>().also { api.gate = it }
             val flow = repo.observeCourses()
             val first = flow.first()
             assertTrue(first.data.isEmpty())
             assertEquals(SyncState.Refreshing, first.state)
+            gate.complete(Unit)
             val loaded = flow.firstMatching { it.state == SyncState.Synced && it.data.size == 2 }
             assertEquals(listOf("a", "b"), loaded.data.map { it.slug })
         }
@@ -153,10 +157,23 @@ class CourseRepositoryTest {
 
             val detail = repo.observeCourse("a").firstMatching { it.data != null }.data!!
             assertEquals(1, detail.counts.sessions["lecture"])
-            assertEquals(2, repo.observeSessions("a").first().data.size)
+            assertEquals(
+                2,
+                repo
+                    .observeSessions("a")
+                    .first()
+                    .data.size,
+            )
             val files = repo.observeFiles("a").first().data
             assertEquals(listOf(FileType.LECTURE, FileType.EXAM), files.map { it.type })
-            assertEquals(listOf("n1"), repo.observeNotes("a").first().data.map { it.id })
+            assertEquals(
+                listOf("n1"),
+                repo
+                    .observeNotes("a")
+                    .first()
+                    .data
+                    .map { it.id },
+            )
         }
 
     @Test
@@ -180,7 +197,13 @@ class CourseRepositoryTest {
 
             val state = repo.refreshCourse("a")
             assertTrue(state is SyncState.Failed && state.isOffline)
-            assertEquals(1, repo.observeFiles("a").first().data.size)
+            assertEquals(
+                1,
+                repo
+                    .observeFiles("a")
+                    .first()
+                    .data.size,
+            )
         }
 
     @Test
@@ -195,7 +218,13 @@ class CourseRepositoryTest {
             assertNotNull(detail)
             assertEquals("Renamed", detail!!.course.name)
             assertEquals(1, detail.counts.sessions["lecture"])
-            assertEquals(1, repo.observeFiles("a").first().data.size)
+            assertEquals(
+                1,
+                repo
+                    .observeFiles("a")
+                    .first()
+                    .data.size,
+            )
         }
 
     @Test
@@ -207,7 +236,13 @@ class CourseRepositoryTest {
             repo.refreshCourses()
 
             assertNull(repo.observeCourse("a").first().data)
-            assertTrue(repo.observeFiles("a").first().data.isEmpty())
+            assertTrue(
+                repo
+                    .observeFiles("a")
+                    .first()
+                    .data
+                    .isEmpty(),
+            )
         }
 
     @Test
@@ -221,9 +256,16 @@ class CourseRepositoryTest {
     @Test
     fun detailCountsDtoRoundTripsEmptyMaps() =
         runBlocking {
-            api.detail = { ApiResult.Success(CourseDetailDto(summaryDto(it), CourseCountsDto(emptyMap(), emptyMap(), 0))) }
+            api.detail = { ApiResult.Success(detailDto(summaryDto(it), CourseCountsDto(emptyMap(), emptyMap(), 0))) }
             repo.refreshCourse("a")
-            assertTrue(repo.observeCourse("a").first().data!!.counts.files.isEmpty())
+            assertTrue(
+                repo
+                    .observeCourse("a")
+                    .first()
+                    .data!!
+                    .counts.files
+                    .isEmpty(),
+            )
         }
 
     private companion object {
