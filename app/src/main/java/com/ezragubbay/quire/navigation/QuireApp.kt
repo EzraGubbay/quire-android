@@ -1,0 +1,135 @@
+package com.ezragubbay.quire.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
+import androidx.navigation.toRoute
+import com.ezragubbay.quire.BuildConfig
+import com.ezragubbay.quire.core.data.session.SessionState
+import com.ezragubbay.quire.feature.auth.PairScreen
+import com.ezragubbay.quire.feature.auth.PairViewModel
+import com.ezragubbay.quire.feature.auth.scan.PairUriParser
+import com.ezragubbay.quire.feature.auth.scan.PairUriResult
+import com.ezragubbay.quire.feature.auth.scan.ScanScreen
+import kotlinx.serialization.Serializable
+
+/** Pair screen; [server] / [code] arrive from a `quire://pair?server=&code=` deep link. */
+@Serializable
+data class PairRoute(
+    val server: String? = null,
+    val code: String? = null,
+)
+
+@Serializable
+data object ScanRoute
+
+private const val DEEP_LINK_BASE = "quire://pair"
+
+/** The signed-in tab shell (its own nested nav graph lives in [AppShell]). */
+@Serializable
+data object ShellRoute
+
+/**
+ * Root navigation: Pair when signed out, the shell when signed in. The start destination comes from the
+ * persisted session; later flips (paired, session expired) navigate and clear the back stack.
+ */
+@Composable
+fun QuireApp(
+    appViewModel: AppViewModel,
+    pairViewModel: PairViewModel,
+) {
+    val signedIn by appViewModel.signedIn.collectAsStateWithLifecycle()
+    val expired by appViewModel.sessionExpired.collectAsStateWithLifecycle()
+    val account by appViewModel.session.collectAsStateWithLifecycle()
+    val isSignedIn = signedIn ?: return
+    val navController = rememberNavController()
+
+    LaunchedEffect(expired) {
+        if (expired) {
+            pairViewModel.onSessionExpired()
+            appViewModel.onExpiredNoticeShown()
+        }
+    }
+
+    LaunchedEffect(isSignedIn) {
+        val destination = navController.currentDestination ?: return@LaunchedEffect
+        val onPair = destination.hasRoute<PairRoute>()
+        val target: Any? =
+            when {
+                isSignedIn && onPair -> ShellRoute
+                !isSignedIn && !onPair -> PairRoute()
+                else -> null
+            }
+        if (target != null) {
+            navController.navigate(target) { popUpTo(navController.graph.id) { inclusive = true } }
+        }
+    }
+
+    NavHost(navController = navController, startDestination = if (isSignedIn) ShellRoute else PairRoute()) {
+        composable<PairRoute>(
+            deepLinks = listOf(navDeepLink<PairRoute>(basePath = DEEP_LINK_BASE)),
+        ) { entry ->
+            PairDestination(
+                entry = entry,
+                pairViewModel = pairViewModel,
+                isSignedIn = isSignedIn,
+                onSignedIn = appViewModel::onSignedIn,
+                onReplaceSessionToShell = {
+                    navController.navigate(ShellRoute) { popUpTo(navController.graph.id) { inclusive = true } }
+                },
+                onScanQr = { navController.navigate(ScanRoute) },
+            )
+        }
+        composable<ScanRoute> {
+            ScanScreen(
+                onScanned = { server, code ->
+                    pairViewModel.onScanned(server, code)
+                    navController.popBackStack()
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<ShellRoute> {
+            AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
+        }
+    }
+}
+
+/**
+ * The Pair destination: applies a `quire://pair` deep link's prefilled args (validated), then shows the
+ * pairing screen. Extracted from [QuireApp] to keep that composable's branching within complexity limits.
+ */
+@Composable
+private fun PairDestination(
+    entry: NavBackStackEntry,
+    pairViewModel: PairViewModel,
+    isSignedIn: Boolean,
+    onSignedIn: () -> Unit,
+    onReplaceSessionToShell: () -> Unit,
+    onScanQr: () -> Unit,
+) {
+    val (server, code) = entry.toRoute<PairRoute>()
+    LaunchedEffect(entry, server, code) {
+        if (server != null || code != null) {
+            val parsed = PairUriParser.validate(server, code, BuildConfig.DEBUG)
+            if (parsed is PairUriResult.Valid) pairViewModel.prefill(parsed.serverUrl, parsed.code)
+        }
+    }
+    PairScreen(
+        viewModel = pairViewModel,
+        onPaired = {
+            // Re-pairing over an existing session: the signed-in flag doesn't flip, so navigate explicitly.
+            if (isSignedIn) onReplaceSessionToShell()
+            onSignedIn()
+        },
+        onScanQr = onScanQr,
+        replacesSession = isSignedIn,
+    )
+}

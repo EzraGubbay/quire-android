@@ -34,14 +34,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ezragubbay.quire.BuildConfig
 import com.ezragubbay.quire.R
+import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.core.data.settings.UserSettings
 import com.ezragubbay.quire.core.designsystem.component.QuireTopBar
 import com.ezragubbay.quire.core.designsystem.component.SectionHeader
 import com.ezragubbay.quire.core.designsystem.theme.ThemeMode
 
+const val SETTINGS_ACCOUNT_TAG = "settings-account"
+const val ACTION_SIGN_OUT_TAG = "action-sign-out"
+
 /** Settings destination root: Appearance (theme mode, device colors) and About. */
 @Composable
 fun SettingsScreen(
+    account: SessionState.SignedIn? = null,
+    onSignOut: () -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
@@ -49,6 +55,8 @@ fun SettingsScreen(
     SettingsContent(
         settings = settings,
         onBack = onBack,
+        account = account,
+        onSignOut = onSignOut,
         onThemeModeSelected = viewModel::onThemeModeSelected,
         onUseDeviceColorsChanged = viewModel::onUseDeviceColorsChanged,
     )
@@ -62,6 +70,8 @@ fun SettingsContent(
     onThemeModeSelected: (ThemeMode) -> Unit,
     onUseDeviceColorsChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    account: SessionState.SignedIn? = null,
+    onSignOut: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showLicenses by rememberSaveable { mutableStateOf(false) }
@@ -122,6 +132,8 @@ fun SettingsContent(
                 )
             }
 
+            if (account != null) AccountSection(account, onSignOut)
+
             SectionHeader(stringResource(R.string.settings_about))
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_version)) },
@@ -147,6 +159,40 @@ fun SettingsContent(
             },
         )
     }
+}
+
+/** Who this device is signed in as, plus Sign out. */
+@Composable
+private fun AccountSection(
+    account: SessionState.SignedIn,
+    onSignOut: () -> Unit,
+) {
+    Column(modifier = Modifier.testTag(SETTINGS_ACCOUNT_TAG)) {
+        SectionHeader(stringResource(R.string.settings_account))
+        AccountRow(R.string.settings_account_server, account.serverUrl)
+        AccountRow(R.string.settings_account_login, account.login)
+        AccountRow(R.string.settings_account_device, account.deviceName)
+        ListItem(
+            headlineContent = {
+                Text(
+                    stringResource(R.string.settings_sign_out),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            },
+            modifier = Modifier.testTag(ACTION_SIGN_OUT_TAG).clickable(role = Role.Button, onClick = onSignOut),
+        )
+    }
+}
+
+@Composable
+private fun AccountRow(
+    label: Int,
+    value: String,
+) {
+    ListItem(
+        headlineContent = { Text(stringResource(label)) },
+        supportingContent = { Text(value) },
+    )
 }
 
 @Composable
