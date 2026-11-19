@@ -14,6 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
             CourseFileEntity::class,
             NoteEntity::class,
             DownloadEntity::class,
+            ReadingPositionEntity::class,
         ],
     version = QuireDatabase.VERSION,
     exportSchema = true,
@@ -31,8 +32,10 @@ abstract class QuireDatabase : RoomDatabase() {
 
     abstract fun downloadDao(): DownloadDao
 
+    abstract fun readingPositionDao(): ReadingPositionDao
+
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
         const val NAME = "quire.db"
     }
 }
@@ -51,5 +54,16 @@ val MIGRATION_1_2: Migration =
         }
     }
 
+/** 2 -> 3: adds the `reading_positions` table (PDF viewer resume, E5-S2). */
+val MIGRATION_2_3: Migration =
+    object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `reading_positions` (`fileId` TEXT NOT NULL, `page` INTEGER NOT NULL, " +
+                    "`updatedAt` INTEGER NOT NULL, PRIMARY KEY(`fileId`))",
+            )
+        }
+    }
+
 /** Every migration between exported schema versions. */
-val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)

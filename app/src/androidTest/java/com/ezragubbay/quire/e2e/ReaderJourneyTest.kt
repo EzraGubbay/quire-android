@@ -90,8 +90,6 @@ class ReaderJourneyTest {
 
     // --- PDF viewer & resume: un-ignored by QMOB-E5-S2 (#37) ------------------------------------
 
-    // un-ignored by QMOB-E5-S2 (#37)
-    @Ignore("QMOB-E5")
     @Test
     fun openDeck_rendersFirstPage_withPageIndicator() {
         enqueueReaderBundle()
@@ -105,8 +103,6 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("page-indicator").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E5-S2 (#37)
-    @Ignore("QMOB-E5")
     @Test
     fun pdfViewer_scrollToThirdPage_rendersThatPage() {
         enqueueReaderBundle()
@@ -121,8 +117,6 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("pdf-page-3").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E5-S2 (#37)
-    @Ignore("QMOB-E5")
     @Test
     fun pdfViewer_doubleTap_zoomsPage() {
         enqueueReaderBundle()
@@ -135,8 +129,6 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("pdf-page-1").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E5-S2 (#37)
-    @Ignore("QMOB-E5")
     @Test
     fun pdfViewer_reopen_resumesLastReadPage() {
         enqueueReaderBundle()

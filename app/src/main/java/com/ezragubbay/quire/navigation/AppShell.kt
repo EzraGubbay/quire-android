@@ -24,6 +24,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.ezragubbay.quire.APP_ROOT_TAG
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
@@ -33,6 +34,7 @@ import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
 import com.ezragubbay.quire.feature.search.SearchScreen
 import com.ezragubbay.quire.feature.settings.SettingsScreen
+import com.ezragubbay.quire.feature.viewer.pdf.PdfViewerScreen
 
 const val ACTION_SETTINGS_TAG = "action-settings"
 const val ACTION_SEARCH_TAG = "action-search"
@@ -54,7 +56,8 @@ fun AppShell(
     val onSettings =
         destination?.hasRoute<SettingsRoute>() == true ||
             destination?.hasRoute<CourseRoute>() == true ||
-            destination?.hasRoute<SearchRoute>() == true
+            destination?.hasRoute<SearchRoute>() == true ||
+            destination?.hasRoute<ViewerRoute>() == true
     val current = TopLevelDestination.entries.firstOrNull { destination?.hasRoute(it.route::class) == true }
 
     Scaffold(
@@ -107,7 +110,14 @@ fun AppShell(
             composable<CoursesRoute> {
                 CoursesScreen(onOpenCourse = { navController.navigate(CourseRoute(it)) })
             }
-            composable<CourseRoute> { CourseScreen(onBack = { navController.popBackStack() }) }
+            composable<CourseRoute> { entry ->
+                val slug = entry.toRoute<CourseRoute>().slug
+                CourseScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFile = { navController.navigate(ViewerRoute(slug, it)) },
+                )
+            }
+            composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
             composable<SearchRoute> {
                 SearchScreen(
                     onBack = { navController.popBackStack() },
