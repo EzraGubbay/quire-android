@@ -38,4 +38,10 @@
     <string name="scan_open_settings">Open settings</string>
     <string name="scan_back">Back</string>
     <string name="pair_error_not_quire">That address doesn\'t look like a Quire server.</string>
+    <string name="pair_error_session_expired">Signed out \u2014 pair again.</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_account_server">Server</string>
+    <string name="settings_account_login">Signed in as</string>
+    <string name="settings_account_device">This device</string>
+    <string name="settings_sign_out">Sign out</string>
 </resources>

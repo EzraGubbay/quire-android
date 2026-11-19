@@ -29,6 +29,8 @@ class MainActivity : ComponentActivity() {
         // Hold the splash until the persisted theme and session are read so the first frame is already themed.
         splash.setKeepOnScreenCondition { !settingsViewModel.loaded.value || appViewModel.signedIn.value == null }
         enableEdgeToEdge()
+        // A recreated activity keeps its ViewModel, so re-check the stored session on every (re)launch.
+        appViewModel.validateSession()
         setContent {
             val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
             QuireTheme(themeMode = settings.themeMode, dynamicColor = settings.useDeviceColors) {

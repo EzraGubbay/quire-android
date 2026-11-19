@@ -44,6 +44,9 @@ class PairViewModel
         /** Fires once after a successful pairing (the session is already stored). */
         val paired: Flow<Unit> = _paired.receiveAsFlow()
 
+        /** Explains why the user is back here: the stored session was revoked or expired. */
+        fun onSessionExpired() = _state.update { it.copy(error = PairError.SessionExpired, loading = false) }
+
         private val _submitRequests = Channel<Unit>(Channel.BUFFERED)
 
         /** Fires after a QR scan prefilled the form: the screen should submit (after any session-replace confirm). */

@@ -23,6 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ezragubbay.quire.APP_ROOT_TAG
+import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
 import com.ezragubbay.quire.feature.courses.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
@@ -36,7 +37,11 @@ const val ACTION_SETTINGS_TAG = "action-settings"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppShell(navController: NavHostController = rememberNavController()) {
+fun AppShell(
+    account: SessionState.SignedIn? = null,
+    onSignOut: () -> Unit = {},
+    navController: NavHostController = rememberNavController(),
+) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
     val onSettings = destination?.hasRoute<SettingsRoute>() == true
@@ -84,7 +89,13 @@ fun AppShell(navController: NavHostController = rememberNavController()) {
             composable<CoursesRoute> { CoursesScreen() }
             composable<DownloadsRoute> { DownloadsScreen() }
             composable<ChatsRoute> { ChatsScreen() }
-            composable<SettingsRoute> { SettingsScreen(onBack = { navController.popBackStack() }) }
+            composable<SettingsRoute> {
+                SettingsScreen(
+                    account = account,
+                    onSignOut = onSignOut,
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
     }
 }
