@@ -23,9 +23,10 @@ the gate; streaming cases `waitUntil` the settled answer.
 6. A `[n]` **citation chip** in the answer opens the cited source in the **PDF viewer at the cited
    page** through the open-file flow; a **Sources** row under the answer lists the cited items.
 7. Failures are shown in plain words with the right action: a **mid-stream error** keeps the partial
-   text and offers **Retry** (retry sends `{ retry: true }`, no duplicate user bubble, and succeeds);
-   **budget reached** is terminal (no Retry); **503 `ai_unavailable`** (AI not configured) is shown;
-   **offline** disables the composer behind a banner and the cached thread list stays readable.
+   text and offers **Retry** (retry re-asks the same question — `POST .../messages` carries only
+   `question`, there is no retry field — without a duplicate user bubble, and succeeds); **budget
+   reached** is terminal (no Retry); **503 `ai_unavailable`** (AI not configured) is shown; **offline**
+   disables the composer behind a banner and the cached thread list stays readable.
 8. From the viewer, **Ask about this document** opens the document-scoped chat, reusing the most recent
    document thread (via `?documentId=`) instead of creating a duplicate; the conversation header names
    the document, and document threads carry a badge in thread lists.
@@ -46,7 +47,7 @@ Shapes mirror the real `mobile-v1` chat contract merged in E1 (`docs/api/mobile-
 | `POST .../messages` → NDJSON, normal | `chat-stream-normal.ndjson` |
 | `POST .../messages` → NDJSON, Markdown + block math | `chat-stream-markdown.ndjson` |
 | `POST .../messages` → NDJSON, mid-stream `error` | `chat-stream-error-midstream.ndjson` |
-| `POST .../messages` → NDJSON, budget `error` (terminal) | `chat-stream-error-budget.ndjson` |
+| `POST .../messages` → NDJSON, terminal `error` (`kind:"budget"`) | `chat-stream-error-budget.ndjson` |
 | `POST .../messages` → `503` envelope | `error-ai-unavailable.json` |
 | `POST .../messages` → `429` envelope | `error-rate-limited.json` (shared) |
 
@@ -56,6 +57,14 @@ done | error`. `user` is first, then zero or more `delta` (`{ text }`), then `do
 pre-stream failure uses the JSON error envelope `{ error: { code, message } }` with a 4xx/5xx status.
 `MockWebServerRule.enqueueNdjsonFixture` serves these chunked and throttled so `delta`s arrive
 incrementally (the UI must render the answer as it grows, not in one atomic update).
+
+**Error codes are the canonical `mobile-v1` `ErrorCode` enum** —
+`unauthorized | not_found | invalid_request | rate_limited | ai_unavailable | internal` — and nothing
+else; the backend can never emit a `code` outside it. The UI's **terminal-vs-retryable** decision
+therefore keys off the error event's **`kind`**, not its `code`: a "budget reached" failure is a valid
+`code:"rate_limited"` carrying `kind:"budget"` (terminal, no Retry), distinct from an ordinary
+`rate_limited`/`ai_unavailable` failure (retryable). `kind` is an open string hint (e.g. `quota`,
+`budget`); the UI treats an unknown `kind` as retryable.
 
 ## Test-tag contract (kebab-case, stable)
 
@@ -72,17 +81,17 @@ incrementally (the UI must render the answer as it grows, not in one atomic upda
 | `screen-conversation` | Conversation screen root |
 | `conversation-doc-header` | Header naming the document for a document-scoped chat |
 | `message-user-{i}` | A user message bubble; `{i}` is its index in the conversation |
-| `message-assistant-{i}` | An assistant message bubble; `{i}` is its index |
+| `message-assistant-{i}` | An assistant message bubble; `{i}` is its index. **MUST exist during streaming** — the bubble appears on the first `delta` (not only at `done`) and grows in place, so the streaming and stop cases can await/assert it mid-stream |
 | `answer-markdown` | The assistant answer's rendered Markdown body (settled-answer node) |
 | `answer-math` | A block-LaTeX node inside an assistant answer (ADR 0002, as `note-math`) |
 | `chat-input` | The composer text field |
 | `action-send` | Send the question (disabled when blank or while streaming) |
-| `action-stop` | Stop the in-flight answer (keeps the partial) |
+| `action-stop` | Stop the in-flight answer (keeps the partial). **MUST be visible while streaming** and go away once generation ends; the stop case waits for its disappearance as proof generation stopped (so a no-op Stop cannot pass) |
 | `citation-chip-{n}` | Inline tappable `[n]` citation chip; opens the source at its page |
 | `sources-row` | The Sources row under an answer |
 | `source-row-{n}` | A cited source entry (title + page) in the Sources row |
 | `chat-error` | An error state in the conversation (plain-words message) |
-| `action-retry` | Retry a retryable failure (absent for terminal `budget`) |
+| `action-retry` | Retry a retryable failure; **absent when the failure is terminal** (keyed off the error's `kind:"budget"`, not its `code`) |
 | `action-ask-about-doc` | Viewer top-bar 'Ask about this document' |
 
 Reused from other epics within the journey (their own contracts own these): `course-card-{slug}`,

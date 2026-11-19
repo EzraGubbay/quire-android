@@ -197,7 +197,14 @@ class ChatJourneyTest {
 
         // Once the assistant bubble appears mid-stream, Stop cancels the call and keeps the partial text.
         awaitTag("message-assistant-1")
+        composeRule.onNodeWithTag("action-stop").assertIsDisplayed()
         composeRule.onNodeWithTag("action-stop").performClick()
+
+        // Generation must observably stop (Stop goes away) before we assert the partial survived, so a
+        // no-op Stop cannot pass; the kept partial bubble stays on screen, marked as stopped.
+        composeRule.waitUntil(TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag("action-stop").fetchSemanticsNodes().isEmpty()
+        }
         composeRule.onNodeWithTag("message-assistant-1").assertIsDisplayed()
     }
 
@@ -282,7 +289,8 @@ class ChatJourneyTest {
         composeRule.onNodeWithTag("message-assistant-1").assertIsDisplayed()
         composeRule.onNodeWithTag("action-retry").assertIsDisplayed()
 
-        // ...retry sends `{ retry: true }` (no duplicate user bubble) and the fresh stream completes.
+        // ...retry re-asks the same question (`POST .../messages` carries only `question`; no retry
+        // field in the contract) without adding a duplicate user bubble, and the fresh stream completes.
         server.enqueueNdjsonFixture(CHAT_STREAM_NORMAL)
         composeRule.onNodeWithTag("action-retry").performClick()
         awaitTag("answer-markdown")
@@ -296,7 +304,8 @@ class ChatJourneyTest {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
         server.enqueueFixture(CHAT_MESSAGES_EMPTY)
-        server.enqueueNdjsonFixture(CHAT_STREAM_ERROR_BUDGET) // monthly AI budget reached — terminal
+        // Budget reached: a valid `code` (`rate_limited`) with `kind:"budget"` marking it terminal.
+        server.enqueueNdjsonFixture(CHAT_STREAM_ERROR_BUDGET)
         launch()
         openChatsTab()
         awaitTag("thread-list")
