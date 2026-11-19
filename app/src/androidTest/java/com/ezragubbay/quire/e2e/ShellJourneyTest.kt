@@ -159,7 +159,8 @@ class ShellJourneyTest {
         // Relaunch the activity; the persisted preference must survive.
         composeRule.activityRule.scenario.recreate()
 
-        composeRule.onNodeWithTag("action-settings").performClick()
+        // Navigation restores the back stack onto Settings after recreate(); no need to re-open it.
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("setting-theme-dark").assertIsSelected()
     }
 
