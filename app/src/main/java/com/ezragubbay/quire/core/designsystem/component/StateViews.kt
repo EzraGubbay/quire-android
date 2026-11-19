@@ -62,6 +62,7 @@ fun ErrorState(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     retryLabel: String = stringResource(R.string.state_retry),
+    retryTag: String = "error-state-retry",
 ) {
     CenteredColumn(modifier.testTag("error-state")) {
         Text(
@@ -71,7 +72,7 @@ fun ErrorState(
             textAlign = TextAlign.Center,
             modifier = Modifier.testTag("error-state-message"),
         )
-        Button(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp).testTag("error-state-retry")) {
+        Button(onClick = onRetry, modifier = Modifier.heightIn(min = 48.dp).testTag(retryTag)) {
             Text(retryLabel)
         }
     }

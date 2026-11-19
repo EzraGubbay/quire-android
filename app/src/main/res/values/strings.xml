@@ -44,4 +44,15 @@
     <string name="settings_account_login">Signed in as</string>
     <string name="settings_account_device">This device</string>
     <string name="settings_sign_out">Sign out</string>
+    <string name="courses_search">Search</string>
+    <string name="courses_other_semester">Other</string>
+    <string name="courses_empty_title">No courses yet</string>
+    <string name="courses_empty_message">Courses you add in Quire on the web show up here.</string>
+    <string name="courses_error">Couldn\'t load your courses.</string>
+    <string name="courses_offline">Offline \u2014 showing saved courses</string>
+    <string name="courses_card_subtitle">%1$s \u00b7 %2$s</string>
+    <plurals name="courses_file_count">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
 </resources>

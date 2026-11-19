@@ -18,22 +18,35 @@ class QuireClient(
 
     suspend fun revokeToken(): ApiResult<Unit> = apiCall { api.revokeToken() }
 
-    override suspend fun courses(): ApiResult<List<CourseSummaryDto>> = apiCall { api.courses() }
+    override suspend fun courses(): ApiResult<List<CourseSummaryDto>> = apiCall(requireBody = true) { api.courses() }
 
-    override suspend fun course(slug: String): ApiResult<CourseDetailDto> = apiCall { api.course(slug) }
+    override suspend fun course(slug: String): ApiResult<CourseDetailDto> =
+        apiCall(requireBody = true) { api.course(slug) }
 
-    override suspend fun sessions(slug: String): ApiResult<List<CourseSessionDto>> = apiCall { api.sessions(slug) }
+    override suspend fun sessions(slug: String): ApiResult<List<CourseSessionDto>> =
+        apiCall(requireBody = true) {
+            api.sessions(slug)
+        }
 
-    override suspend fun files(slug: String): ApiResult<List<CourseFileDto>> = apiCall { api.files(slug) }
+    override suspend fun files(slug: String): ApiResult<List<CourseFileDto>> =
+        apiCall(requireBody = true) {
+            api.files(slug)
+        }
 
-    override suspend fun notes(slug: String): ApiResult<List<NoteDto>> = apiCall { api.notes(slug) }
+    override suspend fun notes(slug: String): ApiResult<List<NoteDto>> = apiCall(requireBody = true) { api.notes(slug) }
 }
 
-/** Runs [call] and maps the response, error envelope and exceptions into an [ApiResult]. */
+/**
+ * Runs [call] and maps the response, error envelope and exceptions into an [ApiResult]. With [requireBody], a 2xx with
+ * no body (e.g. a 204) is a [ApiResult.Failure.Unknown] instead of a bogus `Unit` success for a non-Unit `T`.
+ */
 @Suppress("TooGenericExceptionCaught")
-suspend fun <T> apiCall(call: suspend () -> Response<T>): ApiResult<T> =
+suspend fun <T> apiCall(
+    requireBody: Boolean = false,
+    call: suspend () -> Response<T>,
+): ApiResult<T> =
     try {
-        call().toApiResult()
+        call().toApiResult(requireBody)
     } catch (e: CancellationException) {
         throw e
     } catch (e: IOException) {
@@ -45,8 +58,9 @@ suspend fun <T> apiCall(call: suspend () -> Response<T>): ApiResult<T> =
         ApiResult.Failure.Unknown(message = e.message.orEmpty())
     }
 
-private fun <T> Response<T>.toApiResult(): ApiResult<T> {
+private fun <T> Response<T>.toApiResult(requireBody: Boolean): ApiResult<T> {
     if (isSuccessful) {
+        if (requireBody && body() == null) return ApiResult.Failure.Unknown(code(), "Empty response body")
         @Suppress("UNCHECKED_CAST")
         return ApiResult.Success((body() ?: Unit) as T)
     }
