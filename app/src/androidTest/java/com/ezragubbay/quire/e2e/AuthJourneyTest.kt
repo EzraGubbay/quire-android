@@ -94,8 +94,9 @@ class AuthJourneyTest {
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
     fun enterServerUrlAndCode_pairs_landsOnCourses() {
-        // POST /auth/pair → 200 mints a token (shape mirrors pairDevice.200.json).
+        // POST /auth/pair → 200 mints a token (shape mirrors pairDevice.200.json), then GET /me validates it.
         server.enqueueFixture("pair-success.json")
+        server.enqueueFixture("me.json")
 
         launch()
         pair()
@@ -113,6 +114,7 @@ class AuthJourneyTest {
     @Test
     fun relaunch_afterPairing_staysSignedIn() {
         server.enqueueFixture("pair-success.json")
+        server.enqueueFixture("me.json")
         launch()
         pair()
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
