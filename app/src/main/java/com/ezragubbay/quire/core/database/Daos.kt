@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -157,3 +158,37 @@ abstract class SearchDao {
 
 /** Escapes `\`, `%` and `_` so a user query is matched literally by the `LIKE ... ESCAPE '\'` search queries. */
 fun escapeLike(query: String): String = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+@Dao
+abstract class DownloadDao {
+    @Query("SELECT * FROM downloads WHERE fileId = :fileId")
+    abstract fun observe(fileId: String): Flow<DownloadEntity?>
+
+    @Query("SELECT * FROM downloads ORDER BY courseSlug, updatedAt DESC")
+    abstract fun observeAll(): Flow<List<DownloadEntity>>
+
+    @Query("SELECT * FROM downloads WHERE fileId = :fileId")
+    abstract suspend fun get(fileId: String): DownloadEntity?
+
+    @Query("SELECT COALESCE(SUM(progressBytes), 0) FROM downloads")
+    abstract fun observeStorageBytes(): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(progressBytes), 0) FROM downloads")
+    abstract suspend fun storageBytes(): Long
+
+    @Query("SELECT * FROM downloads")
+    abstract suspend fun getAll(): List<DownloadEntity>
+
+    @Upsert
+    abstract suspend fun upsert(download: DownloadEntity)
+
+    /** No-ops when the row was removed meanwhile, so a late worker write cannot resurrect a removed download. */
+    @Update
+    abstract suspend fun update(download: DownloadEntity): Int
+
+    @Query("DELETE FROM downloads WHERE fileId = :fileId")
+    abstract suspend fun delete(fileId: String)
+
+    @Query("DELETE FROM downloads")
+    abstract suspend fun deleteAll()
+}

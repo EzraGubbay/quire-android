@@ -43,6 +43,9 @@ object DatabaseModule {
     fun noteDao(db: QuireDatabase) = db.noteDao()
 
     @Provides
+    fun downloadDao(db: QuireDatabase) = db.downloadDao()
+
+    @Provides
     fun browseApi(client: QuireClient): BrowseApi = client
 
     @Provides
