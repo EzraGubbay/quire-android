@@ -29,6 +29,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.TimeUnit
 
 /**
  * Epic e2e journey for QMOB-E4 (browse & read: the offline-first course/file browsing surface).
@@ -127,17 +128,23 @@ class CoursesJourneyTest {
         // Pull-to-refresh issues a second GET /courses and upserts the cache.
         enqueueCourses()
         // A plain swipeDown releases with a fling velocity the nested-scroll pull handler consumes before it sees
-        // the drag past the threshold, so the refetch never fired on the emulator. Drive a deliberate pull on the
-        // scrollable list instead: press at the top, drag slowly well past the refresh threshold, hold to bleed off
-        // the velocity, then release — a pull (not a fling), so onRefresh fires exactly once.
-        composeRule.onNodeWithTag("course-list").performTouchInput {
-            down(Offset(centerX, top + 8f))
-            moveTo(Offset(centerX, height * 0.9f), delayMillis = 300)
-            advanceEventTime(300)
-            up()
+        // the drag past the threshold. Drive a deliberate finger-like pull instead: many small moves well past the
+        // (damped) refresh threshold, a pause to bleed off velocity, then release. A synthetic pull can still be
+        // dropped by the emulator's input timing, so retry the gesture; the assertion below still requires a real
+        // second GET /courses caused by the pull.
+        var pulled: RecordedRequest? = null
+        repeat(PULL_ATTEMPTS) {
+            if (pulled == null) {
+                composeRule.onNodeWithTag("course-list").performTouchInput {
+                    down(Offset(centerX, top + 8f))
+                    repeat(PULL_STEPS) { moveBy(Offset(0f, height * 0.8f / PULL_STEPS), delayMillis = 16) }
+                    advanceEventTime(250)
+                    up()
+                }
+                pulled = server.server.takeRequest(PULL_WAIT_SECONDS, TimeUnit.SECONDS)
+            }
         }
-
-        val refresh = takeCoursesRequest()
+        val refresh = requireNotNull(pulled) { "Pull-to-refresh never issued a second GET /courses" }
         assertTrue("Pull-to-refresh must GET /courses again", refresh.path!!.endsWith("/courses"))
         assertTrue("Refresh must be a GET", refresh.method == "GET")
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
@@ -354,6 +361,9 @@ class CoursesJourneyTest {
 
     private companion object {
         const val TIMEOUT_MS = 10_000L
+        const val PULL_ATTEMPTS = 3
+        const val PULL_STEPS = 20
+        const val PULL_WAIT_SECONDS = 4L
         const val LECTURE_FILE_ID = "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
         const val RECITATION_FILE_ID = "7a2d3b63-9c1f-4d7b-ae74-3b4b8d2eaf21"
         const val LECTURE_NOTE_ID = "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"
