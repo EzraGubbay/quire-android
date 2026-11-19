@@ -116,6 +116,8 @@
     <string name="conversation_copy">Copy answer</string>
     <string name="conversation_jump_latest">Jump to latest</string>
     <string name="conversation_history_error">Could not load this conversation.</string>
+    <string name="conversation_doc_header">About: %1$s</string>
+    <string name="viewer_ask">Ask</string>
     <string name="viewer_back">Back</string>
     <string name="viewer_title">Document</string>
     <string name="viewer_jump">Go to page</string>

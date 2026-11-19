@@ -47,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,10 +71,11 @@ const val CHAT_ERROR_TAG = "chat-error"
 @Composable
 fun ConversationScreen(
     onBack: () -> Unit,
+    documentHeader: (@Composable () -> Unit)? = null,
     viewModel: ConversationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ConversationContent(state, onBack, viewModel::send, viewModel::stop, viewModel::retryHistory)
+    ConversationContent(state, onBack, viewModel::send, viewModel::stop, viewModel::retryHistory, documentHeader)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,6 +86,7 @@ internal fun ConversationContent(
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onRetryHistory: () -> Unit,
+    documentHeader: (@Composable () -> Unit)? = null,
 ) {
     Scaffold(
         modifier = Modifier.testTag(CONVERSATION_TAG).imePadding(),
@@ -103,6 +106,7 @@ internal fun ConversationContent(
         bottomBar = { Composer(state.streaming, onSend, onStop) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            documentHeader?.invoke()
             if (state.historyFailed) {
                 ErrorState(stringResource(R.string.conversation_history_error), onRetry = onRetryHistory)
             } else {
@@ -265,3 +269,21 @@ private fun Composer(
 }
 
 private const val MAX_INPUT_LINES = 5
+
+/** Names the document a document-scoped conversation is about. */
+@Composable
+fun DocumentHeader(title: String) {
+    Text(
+        text = stringResource(R.string.conversation_doc_header, title),
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = 16.dp,
+                    vertical = 8.dp,
+                ).testTag("conversation-doc-header"),
+    )
+}

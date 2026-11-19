@@ -30,6 +30,7 @@ import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
 import com.ezragubbay.quire.feature.chat.conversation.ConversationScreen
+import com.ezragubbay.quire.feature.chat.conversation.DocumentHeader
 import com.ezragubbay.quire.feature.chat.threads.CourseThreadsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
@@ -131,9 +132,22 @@ fun AppShell(
                     onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) },
                 )
             }
-            composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
+            composable<ViewerRoute> {
+                PdfViewerScreen(
+                    onBack = { navController.popBackStack() },
+                    onAskAboutDocument = { slug, thread, title ->
+                        navController.navigate(ConversationRoute(slug, thread, title))
+                    },
+                )
+            }
             composable<NoteReaderRoute> { NoteReaderScreen(onBack = { navController.popBackStack() }) }
-            composable<ConversationRoute> { ConversationScreen(onBack = { navController.popBackStack() }) }
+            composable<ConversationRoute> { entry ->
+                val documentTitle = entry.toRoute<ConversationRoute>().documentTitle
+                ConversationScreen(
+                    onBack = { navController.popBackStack() },
+                    documentHeader = documentTitle?.let { { DocumentHeader(it) } },
+                )
+            }
             composable<SearchRoute> {
                 SearchScreen(
                     onBack = { navController.popBackStack() },
