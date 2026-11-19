@@ -8,12 +8,27 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
+import androidx.navigation.toRoute
+import com.ezragubbay.quire.BuildConfig
 import com.ezragubbay.quire.feature.auth.PairScreen
 import com.ezragubbay.quire.feature.auth.PairViewModel
+import com.ezragubbay.quire.feature.auth.scan.PairUriParser
+import com.ezragubbay.quire.feature.auth.scan.PairUriResult
+import com.ezragubbay.quire.feature.auth.scan.ScanScreen
 import kotlinx.serialization.Serializable
 
+/** Pair screen; [server] / [code] arrive from a `quire://pair?server=&code=` deep link. */
 @Serializable
-data object PairRoute
+data class PairRoute(
+    val server: String? = null,
+    val code: String? = null,
+)
+
+@Serializable
+data object ScanRoute
+
+private const val DEEP_LINK_BASE = "quire://pair"
 
 /** The signed-in tab shell (its own nested nav graph lives in [AppShell]). */
 @Serializable
@@ -38,7 +53,7 @@ fun QuireApp(
         val target: Any? =
             when {
                 isSignedIn && onPair -> ShellRoute
-                !isSignedIn && !onPair -> PairRoute
+                !isSignedIn && !onPair -> PairRoute()
                 else -> null
             }
         if (target != null) {
@@ -46,8 +61,39 @@ fun QuireApp(
         }
     }
 
-    NavHost(navController = navController, startDestination = if (isSignedIn) ShellRoute else PairRoute) {
-        composable<PairRoute> { PairScreen(viewModel = pairViewModel, onPaired = appViewModel::onSignedIn) }
+    NavHost(navController = navController, startDestination = if (isSignedIn) ShellRoute else PairRoute()) {
+        composable<PairRoute>(
+            deepLinks = listOf(navDeepLink<PairRoute>(basePath = DEEP_LINK_BASE)),
+        ) { entry ->
+            val (server, code) = entry.toRoute<PairRoute>()
+            LaunchedEffect(entry, server, code) {
+                if (server != null || code != null) {
+                    val parsed = PairUriParser.validate(server, code, BuildConfig.DEBUG)
+                    if (parsed is PairUriResult.Valid) pairViewModel.prefill(parsed.serverUrl, parsed.code)
+                }
+            }
+            PairScreen(
+                viewModel = pairViewModel,
+                onPaired = {
+                    if (isSignedIn) {
+                        // Re-pairing over an existing session: the flag does not flip, so navigate explicitly.
+                        navController.navigate(ShellRoute) { popUpTo(navController.graph.id) { inclusive = true } }
+                    }
+                    appViewModel.onSignedIn()
+                },
+                onScanQr = { navController.navigate(ScanRoute) },
+                replacesSession = isSignedIn,
+            )
+        }
+        composable<ScanRoute> {
+            ScanScreen(
+                onScanned = { server, code ->
+                    pairViewModel.onScanned(server, code)
+                    navController.popBackStack()
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
         composable<ShellRoute> { AppShell() }
     }
 }
