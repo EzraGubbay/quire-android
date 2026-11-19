@@ -1,0 +1,7 @@
+{
+  "courses": [
+    { "id": "c-0", "name": "Placeholder Course 0" },
+    { "id": "c-1", "name": "Placeholder Course 1" },
+    { "id": "c-2", "name": "Placeholder Course 2" }
+  ]
+}
