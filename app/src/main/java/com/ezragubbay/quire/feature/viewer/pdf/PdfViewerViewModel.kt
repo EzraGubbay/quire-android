@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -65,6 +66,13 @@ sealed interface ViewerUiState {
 
 /** A one-shot request for the screen to launch the 'Open with...' chooser on [file]. */
 data class OpenWithRequest(
+    val file: File,
+    val mime: String,
+    val title: String,
+)
+
+/** A downloaded file that can be shared or saved: the local [file], its [mime], and the user-facing [title]. */
+data class ShareTarget(
     val file: File,
     val mime: String,
     val title: String,
@@ -110,6 +118,21 @@ class PdfViewerViewModel
                 .observe(route.fileId)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DownloadState.Idle)
 
+        private var title: String? = null
+
+        /** Non-null only once the file is downloaded and on disk: share and save-a-copy are enabled then. */
+        val shareTarget: StateFlow<ShareTarget?> =
+            downloadState
+                .map { state ->
+                    if (state !is DownloadState.Done) {
+                        null
+                    } else {
+                        downloads.localFile(route.fileId)?.let {
+                            ShareTarget(it, OpenWithMime.forName(it.name), title ?: it.nameWithoutExtension)
+                        }
+                    }
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
         private val openWithChannel = Channel<OpenWithRequest>(Channel.BUFFERED)
         val openWithRequests = openWithChannel.receiveAsFlow()
 
@@ -138,6 +161,7 @@ class PdfViewerViewModel
                             .getForCourse(route.courseSlug)
                             .firstOrNull { it.fileId == route.fileId }
                             ?.toModel()
+                    title = meta?.title
                     val chosen = OpenFileUseCase.plan(meta, downloads.localFile(route.fileId))
                     plan = chosen
                     when (chosen) {

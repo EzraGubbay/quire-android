@@ -1,6 +1,9 @@
 package com.ezragubbay.quire.feature.viewer.pdf
 
 import android.graphics.Bitmap
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -32,7 +35,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -81,8 +86,12 @@ import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.download.DownloadState
 import com.ezragubbay.quire.feature.viewer.DownloadIndicator
 import com.ezragubbay.quire.feature.viewer.DownloadToggle
+import com.ezragubbay.quire.feature.viewer.FORMAT_PDF
 import com.ezragubbay.quire.feature.viewer.OpenWithLauncher
 import com.ezragubbay.quire.feature.viewer.ToggleAction
+import com.ezragubbay.quire.feature.viewer.share.FileNameSanitizer
+import com.ezragubbay.quire.feature.viewer.share.SaveCopy
+import com.ezragubbay.quire.feature.viewer.share.ShareLauncher
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -106,8 +115,34 @@ fun PdfViewerScreen(
             if (!OpenWithLauncher.launch(context, request)) viewModel.onNoAppFound()
         }
     }
+    val scope = rememberCoroutineScope()
+    val shareTarget by viewModel.shareTarget.collectAsStateWithLifecycle()
+    val saveLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
+            val target = shareTarget
+            if (uri != null && target != null) {
+                scope.launch {
+                    val ok = SaveCopy.toUri(context.contentResolver, target.file, uri)
+                    val message = if (ok) R.string.viewer_save_copy_done else R.string.viewer_save_copy_failed
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     PdfViewerContent(
         state = state,
+        canShare = shareTarget != null,
+        onShare = {
+            shareTarget?.let {
+                if (!ShareLauncher.share(context, it.file, it.mime, it.title)) {
+                    Toast.makeText(context, R.string.viewer_share_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+        onSaveCopy = {
+            shareTarget?.let {
+                saveLauncher.launch(FileNameSanitizer.suggestedName(it.title, it.file.extension.ifEmpty { FORMAT_PDF }))
+            }
+        },
         progress = progress,
         downloadState = downloadState,
         onToggleDownload = viewModel::toggleDownload,
@@ -126,6 +161,9 @@ fun PdfViewerScreen(
 @Composable
 internal fun PdfViewerContent(
     state: ViewerUiState,
+    canShare: Boolean,
+    onShare: () -> Unit,
+    onSaveCopy: () -> Unit,
     progress: Float?,
     downloadState: DownloadState,
     onToggleDownload: () -> Unit,
@@ -159,6 +197,17 @@ internal fun PdfViewerContent(
                     actions = {
                         if (ready != null) {
                             DownloadActions(downloadState, onToggleDownload)
+                            if (canShare) {
+                                IconButton(onClick = onShare, modifier = Modifier.testTag("action-share")) {
+                                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.viewer_share))
+                                }
+                                IconButton(onClick = onSaveCopy, modifier = Modifier.testTag("action-save-copy")) {
+                                    Icon(
+                                        Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = stringResource(R.string.viewer_save_copy),
+                                    )
+                                }
+                            }
                             IconButton(
                                 onClick = { jumpOpen = true },
                                 modifier = Modifier.testTag("action-jump-to-page"),
