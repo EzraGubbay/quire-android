@@ -29,6 +29,7 @@ import com.ezragubbay.quire.APP_ROOT_TAG
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
+import com.ezragubbay.quire.feature.chat.conversation.ConversationScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
@@ -59,7 +60,8 @@ fun AppShell(
             destination?.hasRoute<CourseRoute>() == true ||
             destination?.hasRoute<SearchRoute>() == true ||
             destination?.hasRoute<ViewerRoute>() == true ||
-            destination?.hasRoute<NoteReaderRoute>() == true
+            destination?.hasRoute<NoteReaderRoute>() == true ||
+            destination?.hasRoute<ConversationRoute>() == true
     val current = TopLevelDestination.entries.firstOrNull { destination?.hasRoute(it.route::class) == true }
 
     Scaffold(
@@ -122,6 +124,7 @@ fun AppShell(
             }
             composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
             composable<NoteReaderRoute> { NoteReaderScreen(onBack = { navController.popBackStack() }) }
+            composable<ConversationRoute> { ConversationScreen(onBack = { navController.popBackStack() }) }
             composable<SearchRoute> {
                 SearchScreen(
                     onBack = { navController.popBackStack() },

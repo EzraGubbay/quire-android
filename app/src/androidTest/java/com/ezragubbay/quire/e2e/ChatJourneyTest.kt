@@ -173,7 +173,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S3 (#46)
     @Test
-    @Ignore("QMOB-E6")
     fun conversation_send_showsUserBubble_thenStreamsAnswerIncrementally() {
         openThreadReadyToSend()
 
@@ -189,7 +188,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S3 (#46)
     @Test
-    @Ignore("QMOB-E6")
     fun conversation_stopGeneration_keepsPartialAnswer() {
         openThreadReadyToSend()
         composeRule.onNodeWithTag("chat-input").performTextInput("What is convolution?")
@@ -210,7 +208,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S3 (#46)
     @Test
-    @Ignore("QMOB-E6")
     fun conversation_rendersMarkdownAndMath() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)

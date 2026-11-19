@@ -132,7 +132,7 @@ private fun NoteBody(blocks: List<NoteBlock>) {
 }
 
 @Composable
-private fun BlockView(
+internal fun BlockView(
     markwon: Markwon,
     markdown: String,
     modifier: Modifier,
@@ -161,7 +161,7 @@ private fun BlockView(
 
 /** Markwon with JLaTeXMath (block + inline) coloured by the theme's `onSurface`; rebuilt on theme or density change. */
 @Composable
-private fun rememberMarkwon(): Markwon {
+internal fun rememberMarkwon(): Markwon {
     val context = LocalContext.current
     val color = MaterialTheme.colorScheme.onSurface.toArgb()
     val textPx =

@@ -25,3 +25,10 @@ data class ViewerRoute(
     val courseSlug: String,
     val fileId: String,
 )
+
+/** The chat conversation for [threadId] of course [courseSlug]; pushed over the shell from the Chats tab. */
+@Serializable
+data class ConversationRoute(
+    val courseSlug: String,
+    val threadId: String,
+)
