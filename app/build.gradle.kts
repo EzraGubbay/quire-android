@@ -16,7 +16,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.ezragubbay.quire.testing.QuireTestRunner"
     }
 
     buildTypes {
@@ -42,6 +42,10 @@ android {
                 "GradleDependency",
                 "NewerVersionAvailable",
             )
+    }
+
+    testOptions {
+        animationsDisabled = true
     }
 
     buildFeatures {
@@ -76,5 +80,6 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.okhttp.mockwebserver)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
