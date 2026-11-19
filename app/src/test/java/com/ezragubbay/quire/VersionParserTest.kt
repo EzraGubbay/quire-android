@@ -1,7 +1,7 @@
 package com.ezragubbay.quire
 
-import com.ezragubbay.quire.build.AppVersion
-import com.ezragubbay.quire.build.VersionParser
+import com.ezragubbay.quire.buildlogic.AppVersion
+import com.ezragubbay.quire.buildlogic.VersionParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test

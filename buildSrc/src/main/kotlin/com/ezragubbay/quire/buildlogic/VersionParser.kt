@@ -1,4 +1,4 @@
-package com.ezragubbay.quire.build
+package com.ezragubbay.quire.buildlogic
 
 import java.util.Properties
 

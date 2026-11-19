@@ -1,4 +1,4 @@
-import com.ezragubbay.quire.build.VersionParser
+import com.ezragubbay.quire.buildlogic.VersionParser
 import java.util.Properties
 
 plugins {
