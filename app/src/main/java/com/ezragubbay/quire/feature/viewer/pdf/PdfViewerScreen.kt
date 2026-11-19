@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -394,7 +395,7 @@ private fun DownloadActions(
     val removing = DownloadToggle.actionFor(state) == ToggleAction.Remove
     Box(Modifier.testTag(indicator.tag), contentAlignment = Alignment.Center) {
         when (indicator) {
-            DownloadIndicator.Idle -> Unit
+            DownloadIndicator.Idle -> Spacer(Modifier.size(20.dp)) // non-zero footprint so the node is displayed
             DownloadIndicator.Running -> {
                 val fraction = (state as? DownloadState.Running)?.fraction
                 if (fraction != null) {
