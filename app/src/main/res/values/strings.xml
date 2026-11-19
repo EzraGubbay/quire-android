@@ -115,6 +115,12 @@
     <string name="conversation_stopped">Stopped</string>
     <string name="conversation_copy">Copy answer</string>
     <string name="conversation_jump_latest">Jump to latest</string>
+    <string name="conversation_retry">Retry</string>
+    <string name="conversation_offline">Offline \u2014 reconnect to ask questions</string>
+    <string name="conversation_error_budget">Your monthly AI budget has been reached. Try again next month.</string>
+    <string name="conversation_error_ai_unavailable">AI isn\'t set up on the server, so questions can\'t be answered right now.</string>
+    <string name="conversation_error_network">The connection dropped. Your question was kept \u2014 tap Retry.</string>
+    <string name="conversation_error_provider">The AI provider ran into a problem. Tap Retry to ask again.</string>
     <string name="conversation_history_error">Could not load this conversation.</string>
     <string name="viewer_back">Back</string>
     <string name="viewer_title">Document</string>

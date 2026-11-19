@@ -259,7 +259,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun stream_errorMidStream_keepsPartial_showsRetry_retrySucceeds() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -288,7 +287,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun stream_budgetReached_showsError_withoutRetry() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -311,7 +309,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun preStream_aiUnavailable_showsError() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -332,10 +329,13 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S5 (#48)
     @Test
-    @Ignore("QMOB-E6")
     fun conversation_offline_disablesComposer_showsBanner() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
+        // Two history responses: loadHistory() and the reachability probe both GET /messages at init
+        // (order not guaranteed); serving both removes the race. The probe's NEXT poll, after the
+        // shutdown below, is the one that has no response and flips the VM offline.
+        server.enqueueFixture(CHAT_MESSAGES_HISTORY)
         server.enqueueFixture(CHAT_MESSAGES_HISTORY)
         launch()
         openChatsTab()

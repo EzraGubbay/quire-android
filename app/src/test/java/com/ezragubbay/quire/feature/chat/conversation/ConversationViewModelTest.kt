@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,8 +29,14 @@ class ConversationViewModelTest {
     private class FakeSource(
         var history: ApiResult<List<ChatMessageDto>> = ApiResult.Success(emptyList()),
     ) : ConversationSource {
-        val stream = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 16)
+        var stream = MutableSharedFlow<ChatEvent>(extraBufferCapacity = 16)
         val asked = mutableListOf<String>()
+        val reachable = MutableStateFlow(true)
+
+        override fun observeReachable(
+            slug: String,
+            threadId: String,
+        ): Flow<Boolean> = reachable
 
         override fun observeMessages(
             slug: String,
@@ -202,7 +209,8 @@ class ConversationViewModelTest {
                 vm.state.value.bubbles[1]
                     .text,
             )
-            assertEquals("boom", vm.state.value.error)
+            assertEquals(ChatFailure.Provider, vm.state.value.error)
+            assertTrue(vm.state.value.retryable)
         }
 
     @Test
@@ -218,5 +226,151 @@ class ConversationViewModelTest {
             vm.send("Q2")
             advanceUntilIdle()
             assertNull(vm.state.value.error)
+        }
+
+    @Test
+    fun budgetError_isTerminal_noRetry_partialKept() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            vm.send("Q")
+            advanceUntilIdle()
+            source.stream.emit(ChatEvent.Delta("par"))
+            source.stream.emit(ChatEvent.Error(ErrorCode.RateLimited, ChatEvent.KIND_BUDGET, "budget"))
+            advanceUntilIdle()
+            assertEquals(ChatFailure.Budget, vm.state.value.error)
+            assertFalse(vm.state.value.retryable)
+            assertEquals(
+                "par",
+                vm.state.value.bubbles[1]
+                    .text,
+            )
+            vm.retry()
+            advanceUntilIdle()
+            assertEquals(listOf("Q"), source.asked)
+        }
+
+    @Test
+    fun rateLimitedWithoutBudgetKind_isRetryable() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            vm.send("Q")
+            advanceUntilIdle()
+            source.stream.emit(ChatEvent.Error(ErrorCode.RateLimited, null, "slow down"))
+            advanceUntilIdle()
+            assertEquals(ChatFailure.Provider, vm.state.value.error)
+            assertTrue(vm.state.value.retryable)
+        }
+
+    @Test
+    fun preStreamAiUnavailable_isRetryableWithOwnFailure() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            vm.send("Q")
+            advanceUntilIdle()
+            source.stream.emit(ChatEvent.Error(ErrorCode.AiUnavailable, null, ""))
+            advanceUntilIdle()
+            assertEquals(ChatFailure.AiUnavailable, vm.state.value.error)
+            assertTrue(vm.state.value.retryable)
+            assertEquals(1, vm.state.value.bubbles.size)
+        }
+
+    @Test
+    fun networkDropMidStream_keepsPartial_isRetryable() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            vm.send("Q")
+            advanceUntilIdle()
+            source.stream.emit(ChatEvent.Delta("par"))
+            source.stream.emit(ChatEvent.Error(ErrorCode.Internal, ChatEvent.KIND_NETWORK, "reset"))
+            advanceUntilIdle()
+            assertEquals(ChatFailure.Network, vm.state.value.error)
+            assertTrue(vm.state.value.retryable)
+            assertEquals(
+                "par",
+                vm.state.value.bubbles[1]
+                    .text,
+            )
+        }
+
+    @Test
+    fun retry_resendsSameQuestion_noDuplicateUserBubble_replacesFailedBubble() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            vm.send("Q")
+            advanceUntilIdle()
+            source.stream.emit(ChatEvent.Delta("par"))
+            source.stream.emit(ChatEvent.Error(ErrorCode.Internal, null, "boom"))
+            advanceUntilIdle()
+
+            source.stream = MutableSharedFlow(extraBufferCapacity = 16)
+            vm.retry()
+            advanceUntilIdle()
+            assertEquals(listOf("Q", "Q"), source.asked)
+            assertNull(vm.state.value.error)
+            assertTrue(vm.state.value.streaming)
+            assertEquals(
+                listOf("Q"),
+                vm.state.value.bubbles
+                    .map { it.text },
+            )
+
+            source.stream.emit(ChatEvent.Delta("ok"))
+            source.stream.emit(ChatEvent.Done(msg("a", "assistant", "ok!")))
+            advanceUntilIdle()
+            assertEquals(
+                listOf("Q", "ok!"),
+                vm.state.value.bubbles
+                    .map { it.text },
+            )
+            assertEquals(
+                listOf(Role.User, Role.Assistant),
+                vm.state.value.bubbles
+                    .map { it.role },
+            )
+            assertFalse(vm.state.value.streaming)
+        }
+
+    @Test
+    fun retry_withoutFailure_isNoOp() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            vm.retry()
+            advanceUntilIdle()
+            assertTrue(source.asked.isEmpty())
+        }
+
+    @Test
+    fun offline_flagFollowsReachability_andBlocksSend() =
+        runTest(dispatcher) {
+            val source = FakeSource()
+            val vm = vm(source)
+            advanceUntilIdle()
+            assertFalse(vm.state.value.offline)
+
+            source.reachable.value = false
+            advanceUntilIdle()
+            assertTrue(vm.state.value.offline)
+            vm.send("Q")
+            advanceUntilIdle()
+            assertTrue(source.asked.isEmpty())
+
+            source.reachable.value = true
+            advanceUntilIdle()
+            assertFalse(vm.state.value.offline)
+            vm.send("Q")
+            advanceUntilIdle()
+            assertEquals(listOf("Q"), source.asked)
         }
 }
