@@ -112,6 +112,15 @@
     <string name="viewer_loading">Preparing document</string>
     <string name="viewer_error">Could not open this document.</string>
     <string name="viewer_retry">Retry</string>
+    <string name="viewer_cancel">Cancel</string>
+    <string name="viewer_unsupported">This file cannot be shown here.</string>
+    <string name="viewer_download">Download for offline</string>
+    <string name="viewer_remove_download">Remove download</string>
+    <string name="viewer_downloaded">Downloaded</string>
+    <string name="viewer_download_failed">Download failed</string>
+    <string name="viewer_original_only">This file has no preview. Open it in another app.</string>
+    <string name="viewer_open_with">Open with…</string>
+    <string name="viewer_no_app">No app installed can open this type of file.</string>
     <string name="downloads_empty_title">No downloads yet</string>
     <string name="downloads_empty_message">Files you save for offline reading appear here.</string>
     <string name="downloads_storage_used">Storage used: %1$s</string>

@@ -153,7 +153,6 @@ class ReaderJourneyTest {
     // --- Open-file flow (stream-to-cache, download toggle, open-with): QMOB-E5-S3 (#38) ---------
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun tapFile_streamsContentToCache_thenShowsViewer() {
         enqueueReaderBundle()
@@ -169,7 +168,6 @@ class ReaderJourneyTest {
     }
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun viewer_toggleDownload_persistsOffline_reachesDoneState() {
         enqueueReaderBundle()
@@ -185,7 +183,6 @@ class ReaderJourneyTest {
     }
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun downloadedFile_opensWithServerDown() {
         enqueueReaderBundle()
@@ -204,7 +201,6 @@ class ReaderJourneyTest {
     }
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun originalOnlyFile_offersOpenWith() {
         enqueueCourses()
@@ -263,9 +259,14 @@ class ReaderJourneyTest {
     fun downloadsTab_retryFailedDownload_restarts() {
         enqueueCourses()
         enqueueCourseDetail()
-        server.enqueueFixture("error-not-found.json", code = 404) // the first content fetch fails
+        enqueuePdf() // viewing streams to cache (not a download)
+        server.enqueueFixture("error-not-found.json", code = 404) // the persisted download fails
         launch()
         openLectureFile()
+        awaitTag("pdf-page-1")
+        composeRule.onNodeWithTag("viewer-download-toggle").performClick()
+        awaitTag("download-state-failed")
+        pressBack()
 
         // A failed download surfaces a failed state with a retry; retrying re-enqueues the work.
         composeRule.onNodeWithTag("nav-downloads").performClick()
@@ -367,7 +368,8 @@ class ReaderJourneyTest {
     private fun enqueueReaderBundle() {
         enqueueCourses()
         enqueueCourseDetail()
-        enqueuePdf()
+        enqueuePdf() // the stream-to-cache view
+        enqueuePdf() // the persisted download, when a case toggles it on
     }
 
     /** The next recorded request to the file-content endpoint, skipping browse/session calls. */

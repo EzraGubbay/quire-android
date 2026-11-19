@@ -6,29 +6,55 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.ezragubbay.quire.core.data.course.toModel
+import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.download.DownloadRepository
 import com.ezragubbay.quire.core.download.DownloadState
+import com.ezragubbay.quire.feature.viewer.DownloadToggle
+import com.ezragubbay.quire.feature.viewer.FORMAT_PDF
+import com.ezragubbay.quire.feature.viewer.OpenFileUseCase
+import com.ezragubbay.quire.feature.viewer.OpenPlan
+import com.ezragubbay.quire.feature.viewer.OpenSource
+import com.ezragubbay.quire.feature.viewer.OpenWithMime
+import com.ezragubbay.quire.feature.viewer.ToggleAction
+import com.ezragubbay.quire.feature.viewer.ViewerStreamer
 import com.ezragubbay.quire.navigation.ViewerRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
-private const val PDF_FORMAT = "pdf"
+private const val STOP_TIMEOUT_MS = 5_000L
 
 sealed interface ViewerUiState {
     data object Loading : ViewerUiState
 
     data object Error : ViewerUiState
+
+    /** Nothing the PDF viewer can show for this file (e.g. Markdown-only, which opens in the notes reader). */
+    data object Unsupported : ViewerUiState
+
+    /** Original-only file: no in-app view; offer 'Open with...'. [noApp] once no installed app could open it. */
+    data class OpenWith(
+        val title: String,
+        val busy: Boolean = false,
+        val failed: Boolean = false,
+        val noApp: Boolean = false,
+    ) : ViewerUiState
 
     /** [startPage] is the 0-based page to open on (the restored last-read page). */
     data class Ready(
@@ -36,6 +62,13 @@ sealed interface ViewerUiState {
         val startPage: Int,
     ) : ViewerUiState
 }
+
+/** A one-shot request for the screen to launch the 'Open with...' chooser on [file]. */
+data class OpenWithRequest(
+    val file: File,
+    val mime: String,
+    val title: String,
+)
 
 @HiltViewModel
 class PdfViewerViewModel
@@ -45,6 +78,8 @@ class PdfViewerViewModel
         @ApplicationContext context: Context,
         private val downloads: DownloadRepository,
         private val positions: ReadingPositionStore,
+        private val db: QuireDatabase,
+        private val streamer: ViewerStreamer,
     ) : ViewModel() {
         private val route = savedState.toRoute<ViewerRoute>()
         private val cacheBytes =
@@ -61,7 +96,25 @@ class PdfViewerViewModel
         private val _immersive = MutableStateFlow(false)
         val immersive: StateFlow<Boolean> = _immersive.asStateFlow()
 
+        /** Stream-to-cache progress (0..1), or null while unknown / not streaming. */
+        private val _progress = MutableStateFlow<Float?>(null)
+        val progress: StateFlow<Float?> = _progress.asStateFlow()
+
+        private val onStreamProgress: (Long, Long?) -> Unit = { read, total ->
+            _progress.value = total?.let { (read.toFloat() / it).coerceIn(0f, 1f) }
+        }
+
+        /** Persisted-download state for this file; the toggle drives it through [DownloadRepository]. */
+        val downloadState: StateFlow<DownloadState> =
+            downloads
+                .observe(route.fileId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), DownloadState.Idle)
+
+        private val openWithChannel = Channel<OpenWithRequest>(Channel.BUFFERED)
+        val openWithRequests = openWithChannel.receiveAsFlow()
+
         private var loadJob: Job? = null
+        private var plan: OpenPlan? = null
 
         init {
             load()
@@ -69,33 +122,88 @@ class PdfViewerViewModel
 
         fun retry() = load()
 
-        /** Gets the PDF through the download engine (enqueued if absent), then opens it from the cached file. */
+        /**
+         * Opens per [OpenFileUseCase]: a downloaded file from disk, otherwise streamed into the evictable viewer
+         * cache (never a persisted download; the toggle is the only thing that creates one).
+         */
         private fun load() {
             loadJob?.cancel()
             _state.value = ViewerUiState.Loading
+            _progress.value = null
             loadJob =
                 viewModelScope.launch {
-                    val file = downloads.localFile(route.fileId)
-                    if (file == null) {
-                        downloads.enqueue(route.courseSlug, route.fileId, PDF_FORMAT)
-                        val terminal =
-                            downloads.observe(route.fileId).first {
-                                it is DownloadState.Done ||
-                                    it is DownloadState.Failed
-                            }
-                        if (terminal is DownloadState.Failed) return@launch fail()
+                    val meta =
+                        db
+                            .fileDao()
+                            .getForCourse(route.courseSlug)
+                            .firstOrNull { it.fileId == route.fileId }
+                            ?.toModel()
+                    val chosen = OpenFileUseCase.plan(meta, downloads.localFile(route.fileId))
+                    plan = chosen
+                    when (chosen) {
+                        OpenPlan.Unsupported -> _state.value = ViewerUiState.Unsupported
+                        is OpenPlan.OpenWith -> _state.value = ViewerUiState.OpenWith(chosen.title)
+                        is OpenPlan.ViewPdf -> showPdf(chosen.source)
                     }
-                    val local = file ?: downloads.localFile(route.fileId) ?: return@launch fail()
-                    runCatching { PdfDocument.open(local, cacheBytes) }
-                        .onSuccess { doc ->
-                            val saved = positions.lastPage(route.fileId) ?: 0
-                            _state.value = ViewerUiState.Ready(doc, RenderWindow.clampPage(saved, doc.pageCount))
-                        }.onFailure { fail() }
                 }
         }
 
-        private fun fail() {
-            _state.value = ViewerUiState.Error
+        private suspend fun showPdf(source: OpenSource) {
+            val local =
+                runCatching { streamer.resolve(source, route.courseSlug, route.fileId, null, onStreamProgress) }
+                    .getOrElse { e ->
+                        if (e is CancellationException) throw e
+                        return _state.update { ViewerUiState.Error }
+                    }
+            runCatching { PdfDocument.open(local, cacheBytes) }
+                .onSuccess { doc ->
+                    val saved = positions.lastPage(route.fileId) ?: 0
+                    _state.value = ViewerUiState.Ready(doc, RenderWindow.clampPage(saved, doc.pageCount))
+                }.onFailure {
+                    if (source is OpenSource.Stream) local.delete() // a corrupt cache entry must not stick
+                    _state.value = ViewerUiState.Error
+                }
+        }
+
+        /** Download toggle: Idle/Failed enqueue a persisted download; Running/Done remove it. */
+        fun toggleDownload() {
+            viewModelScope.launch {
+                when (DownloadToggle.actionFor(downloadState.value)) {
+                    ToggleAction.Enqueue -> downloads.enqueue(route.courseSlug, route.fileId, FORMAT_PDF)
+                    ToggleAction.Remove -> downloads.remove(route.fileId)
+                }
+            }
+        }
+
+        /** 'Open with...' for an original-only file: fetch (or reuse) the original, then ask the screen to launch. */
+        fun openWith() {
+            val current = _state.value as? ViewerUiState.OpenWith
+            val source = (plan as? OpenPlan.OpenWith)?.source
+            if (current == null || source == null || current.busy) return
+            loadJob?.cancel()
+            _state.value = current.copy(busy = true, failed = false, noApp = false)
+            loadJob =
+                viewModelScope.launch {
+                    runCatching {
+                        streamer.resolve(
+                            source,
+                            route.courseSlug,
+                            route.fileId,
+                            current.title,
+                            onStreamProgress,
+                        )
+                    }.onSuccess {
+                        _state.value = current.copy(busy = false)
+                        openWithChannel.send(OpenWithRequest(it, OpenWithMime.forName(current.title), current.title))
+                    }.onFailure { e ->
+                        if (e is CancellationException) throw e
+                        _state.value = current.copy(busy = false, failed = true)
+                    }
+                }
+        }
+
+        fun onNoAppFound() {
+            (_state.value as? ViewerUiState.OpenWith)?.let { _state.value = it.copy(noApp = true) }
         }
 
         fun onPageChanged(page: Int) {

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -27,8 +28,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,6 +63,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -69,6 +76,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezragubbay.quire.R
+import com.ezragubbay.quire.core.download.DownloadState
+import com.ezragubbay.quire.feature.viewer.DownloadIndicator
+import com.ezragubbay.quire.feature.viewer.DownloadToggle
+import com.ezragubbay.quire.feature.viewer.OpenWithLauncher
+import com.ezragubbay.quire.feature.viewer.ToggleAction
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -84,8 +96,20 @@ fun PdfViewerScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val zoom by viewModel.zoom.collectAsStateWithLifecycle()
     val immersive by viewModel.immersive.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.openWithRequests.collect { request ->
+            if (!OpenWithLauncher.launch(context, request)) viewModel.onNoAppFound()
+        }
+    }
     PdfViewerContent(
         state = state,
+        progress = progress,
+        downloadState = downloadState,
+        onToggleDownload = viewModel::toggleDownload,
+        onOpenWith = viewModel::openWith,
         zoom = zoom,
         immersive = immersive,
         onBack = onBack,
@@ -100,6 +124,10 @@ fun PdfViewerScreen(
 @Composable
 internal fun PdfViewerContent(
     state: ViewerUiState,
+    progress: Float?,
+    downloadState: DownloadState,
+    onToggleDownload: () -> Unit,
+    onOpenWith: () -> Unit,
     zoom: ZoomState,
     immersive: Boolean,
     onBack: () -> Unit,
@@ -127,6 +155,7 @@ internal fun PdfViewerContent(
                     },
                     actions = {
                         if (ready != null) {
+                            DownloadActions(downloadState, onToggleDownload)
                             IconButton(
                                 onClick = { jumpOpen = true },
                                 modifier = Modifier.testTag("action-jump-to-page"),
@@ -143,10 +172,27 @@ internal fun PdfViewerContent(
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (state) {
                 ViewerUiState.Loading ->
-                    Box(Modifier.fillMaxSize().testTag("screen-pdf-viewer"), contentAlignment = Alignment.Center) {
+                    Column(
+                        Modifier.fillMaxSize().testTag("screen-pdf-viewer"),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         val label = stringResource(R.string.viewer_loading)
-                        CircularProgressIndicator(Modifier.semantics { contentDescription = label })
+                        val indicator = Modifier.testTag("viewer-progress").semantics { contentDescription = label }
+                        if (progress != null) {
+                            CircularProgressIndicator(progress = { progress }, modifier = indicator)
+                        } else {
+                            CircularProgressIndicator(indicator)
+                        }
+                        TextButton(onClick = onBack, modifier = Modifier.testTag("viewer-cancel")) {
+                            Text(stringResource(R.string.viewer_cancel))
+                        }
                     }
+                ViewerUiState.Unsupported ->
+                    Box(Modifier.fillMaxSize().testTag("screen-pdf-viewer"), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.viewer_unsupported))
+                    }
+                is ViewerUiState.OpenWith -> OpenWithPane(state, onOpenWith)
                 ViewerUiState.Error ->
                     Column(
                         Modifier.fillMaxSize().testTag("screen-pdf-viewer"),
@@ -336,4 +382,77 @@ private fun JumpDialog(
             ) { Text(stringResource(R.string.viewer_jump_confirm)) }
         },
     )
+}
+
+/** The download state indicator plus the toggle (idle -> running -> done, or failed with retry). */
+@Composable
+private fun DownloadActions(
+    state: DownloadState,
+    onToggle: () -> Unit,
+) {
+    val indicator = DownloadToggle.indicatorFor(state)
+    val removing = DownloadToggle.actionFor(state) == ToggleAction.Remove
+    Box(Modifier.testTag(indicator.tag), contentAlignment = Alignment.Center) {
+        when (indicator) {
+            DownloadIndicator.Idle -> Unit
+            DownloadIndicator.Running -> {
+                val fraction = (state as? DownloadState.Running)?.fraction
+                if (fraction != null) {
+                    CircularProgressIndicator(progress = { fraction }, modifier = Modifier.size(20.dp))
+                } else {
+                    CircularProgressIndicator(Modifier.size(20.dp))
+                }
+            }
+            DownloadIndicator.Done ->
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = stringResource(R.string.viewer_downloaded),
+                )
+            DownloadIndicator.Failed ->
+                Icon(
+                    Icons.Filled.Warning,
+                    contentDescription = stringResource(R.string.viewer_download_failed),
+                )
+        }
+    }
+    IconButton(onClick = onToggle, modifier = Modifier.testTag("viewer-download-toggle")) {
+        Icon(
+            if (removing) Icons.Filled.Close else Icons.Filled.Add,
+            contentDescription =
+                stringResource(
+                    if (removing) R.string.viewer_remove_download else R.string.viewer_download,
+                ),
+        )
+    }
+}
+
+/** Original-only file: no in-app view, so offer 'Open with...' (or explain that nothing can open it). */
+@Composable
+private fun OpenWithPane(
+    state: ViewerUiState.OpenWith,
+    onOpenWith: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxSize().testTag("screen-pdf-viewer").padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(state.title, style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.viewer_original_only), modifier = Modifier.padding(vertical = 12.dp))
+        if (state.busy) {
+            CircularProgressIndicator(Modifier.testTag("viewer-progress"))
+        } else {
+            Button(onClick = onOpenWith, modifier = Modifier.testTag("action-open-with")) {
+                Text(stringResource(R.string.viewer_open_with))
+            }
+        }
+        if (state.failed) Text(stringResource(R.string.viewer_error), color = MaterialTheme.colorScheme.error)
+        if (state.noApp) {
+            Text(
+                stringResource(R.string.viewer_no_app),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag("open-with-no-app"),
+            )
+        }
+    }
 }
