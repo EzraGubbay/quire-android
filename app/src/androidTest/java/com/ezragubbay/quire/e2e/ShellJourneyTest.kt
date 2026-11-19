@@ -12,7 +12,6 @@ import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -133,7 +132,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S5 (#21)
     @Test
-    @Ignore("QMOB-E2")
     fun settings_exposesThemeOptions() {
         composeRule.onNodeWithTag("action-settings").performClick()
 
@@ -144,7 +142,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S5 (#21)
     @Test
-    @Ignore("QMOB-E2")
     fun changingTheme_selectsOptionImmediately() {
         composeRule.onNodeWithTag("action-settings").performClick()
 
@@ -154,7 +151,6 @@ class ShellJourneyTest {
 
     // un-ignored by QMOB-E2-S5 (#21)
     @Test
-    @Ignore("QMOB-E2")
     fun themeChoice_persistsAcrossRelaunch() {
         composeRule.onNodeWithTag("action-settings").performClick()
         composeRule.onNodeWithTag("setting-theme-dark").performClick()
@@ -163,7 +159,8 @@ class ShellJourneyTest {
         // Relaunch the activity; the persisted preference must survive.
         composeRule.activityRule.scenario.recreate()
 
-        composeRule.onNodeWithTag("action-settings").performClick()
+        // Navigation restores the back stack onto Settings after recreate(); no need to re-open it.
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("setting-theme-dark").assertIsSelected()
     }
 

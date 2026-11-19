@@ -2,7 +2,6 @@ package com.ezragubbay.quire.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -33,7 +32,7 @@ const val ACTION_SETTINGS_TAG = "action-settings"
 
 /**
  * The app shell: top bar (Settings action), bottom bar (Courses, Downloads, Chats) and the nav host.
- * Settings is pushed over the shell with a back arrow instead of the bottom bar.
+ * Settings is pushed over the shell with its own top bar (back arrow) instead of this chrome.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,26 +45,20 @@ fun AppShell(navController: NavHostController = rememberNavController()) {
     Scaffold(
         modifier = Modifier.testTag(APP_ROOT_TAG),
         topBar = {
-            TopAppBar(
-                title = { Text(if (onSettings) "Settings" else current?.label.orEmpty()) },
-                navigationIcon = {
-                    if (onSettings) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                },
-                actions = {
-                    if (!onSettings) {
+            // Settings brings its own large top bar (with back).
+            if (!onSettings) {
+                TopAppBar(
+                    title = { Text(current?.label.orEmpty()) },
+                    actions = {
                         IconButton(
                             onClick = { navController.navigate(SettingsRoute) { launchSingleTop = true } },
                             modifier = Modifier.testTag(ACTION_SETTINGS_TAG),
                         ) {
                             Icon(Icons.Filled.Settings, contentDescription = "Settings")
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         bottomBar = {
             if (!onSettings) {
@@ -91,7 +84,7 @@ fun AppShell(navController: NavHostController = rememberNavController()) {
             composable<CoursesRoute> { CoursesScreen() }
             composable<DownloadsRoute> { DownloadsScreen() }
             composable<ChatsRoute> { ChatsScreen() }
-            composable<SettingsRoute> { SettingsScreen() }
+            composable<SettingsRoute> { SettingsScreen(onBack = { navController.popBackStack() }) }
         }
     }
 }
