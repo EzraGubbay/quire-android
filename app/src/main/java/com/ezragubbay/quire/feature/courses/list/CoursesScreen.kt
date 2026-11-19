@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -91,6 +93,8 @@ private fun CourseGroups(
     Column(Modifier.fillMaxSize()) {
         if (state.offline) OfflineBanner()
         Box(Modifier.fillMaxSize().testTag("courses-refresh")) {
+            // Present only while a refresh is in flight; lets tests await the refresh settling.
+            if (state.refreshing) Box(Modifier.size(1.dp).testTag("courses-refreshing"))
             QuirePullToRefresh(isRefreshing = state.refreshing, onRefresh = onRefresh) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().testTag("course-list"),

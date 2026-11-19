@@ -118,6 +118,10 @@ class CoursesJourneyTest {
         composeRule.onNodeWithTag("course-list").assertIsDisplayed()
         takeCoursesRequest() // the first GET /courses on launch
         // Let the launch refresh settle: while it is in flight the pull-to-refresh is "busy" and drops the drag.
+        // A request being sent is not the refresh finishing: wait until the refreshing indicator state clears.
+        composeRule.waitUntil(TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag("courses-refreshing").fetchSemanticsNodes().isEmpty()
+        }
         composeRule.waitForIdle()
 
         // Pull-to-refresh issues a second GET /courses and upserts the cache.
