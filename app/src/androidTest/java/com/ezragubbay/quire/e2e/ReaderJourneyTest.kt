@@ -15,7 +15,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
-import com.ezragubbay.quire.core.download.DownloadRepository
+import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -85,7 +85,7 @@ class ReaderJourneyTest {
     @get:Rule(order = 3)
     val composeRule = createEmptyComposeRule()
 
-    @Inject lateinit var downloads: DownloadRepository
+    @Inject lateinit var db: QuireDatabase
 
     private var scenario: ActivityScenario<MainActivity>? = null
 
@@ -93,12 +93,11 @@ class ReaderJourneyTest {
     @Before
     fun resetOfflineState() {
         hilt.inject()
-        runBlocking { downloads.removeAll() }
-        ApplicationProvider
-            .getApplicationContext<Context>()
-            .cacheDir
-            .resolve("viewer")
-            .deleteRecursively()
+        // Direct DAO/file reset: going through DownloadRepository would touch WorkManager before the app starts.
+        runBlocking { db.downloadDao().deleteAll() }
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.cacheDir.resolve("viewer").deleteRecursively()
+        context.filesDir.resolve("downloads").deleteRecursively()
     }
 
     @After
