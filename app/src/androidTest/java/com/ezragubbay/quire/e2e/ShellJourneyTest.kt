@@ -10,6 +10,9 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
+import com.ezragubbay.quire.testing.SessionSeedRule
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -28,12 +31,20 @@ import org.junit.runner.RunWith
  * Journey: launch → Courses is the start destination → switch tabs (scroll/state kept) →
  * system back behaviour → open Settings → change theme → relaunch persists the theme.
  */
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class ShellJourneyTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val hilt = HiltAndroidRule(this)
+
+    // The shell is only shown to a paired install.
+    @get:Rule(order = 1)
+    val session = SessionSeedRule(signedIn = true)
+
+    @get:Rule(order = 2)
     val composeRule = createAndroidComposeRule<MainActivity>()
 
-    @get:Rule
+    @get:Rule(order = 3)
     val server = MockWebServerRule()
 
     @Before

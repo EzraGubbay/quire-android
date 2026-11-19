@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -14,6 +15,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
+import com.ezragubbay.quire.testing.SessionSeedRule
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
 import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -48,12 +52,20 @@ import org.junit.runner.RunWith
  *  - #24 (S1, network core) and #25 (S2, secure session storage) underpin every case but un-ignore
  *    none directly — they are prerequisites, verified by their own unit/instrumented tests.
  */
+@HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class AuthJourneyTest {
-    @get:Rule
+    @get:Rule(order = 0)
+    val hilt = HiltAndroidRule(this)
+
+    // Every case starts from a fresh install (no stored session).
+    @get:Rule(order = 1)
+    val session = SessionSeedRule(signedIn = false)
+
+    @get:Rule(order = 2)
     val composeRule = createEmptyComposeRule()
 
-    @get:Rule
+    @get:Rule(order = 3)
     val server = MockWebServerRule()
 
     private var scenario: ActivityScenario<MainActivity>? = null
@@ -67,7 +79,6 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
-    @Ignore("QMOB-E3")
     fun freshInstall_showsPairScreen_notTabShell() {
         launch()
 
@@ -82,7 +93,6 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
-    @Ignore("QMOB-E3")
     fun enterServerUrlAndCode_pairs_landsOnCourses() {
         // POST /auth/pair → 200 mints a token (shape mirrors pairDevice.200.json).
         server.enqueueFixture("pair-success.json")
@@ -101,7 +111,6 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
-    @Ignore("QMOB-E3")
     fun relaunch_afterPairing_staysSignedIn() {
         server.enqueueFixture("pair-success.json")
         launch()
@@ -120,7 +129,6 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
-    @Ignore("QMOB-E3")
     fun invalidOrExpiredCode_showsError_staysOnPair() {
         // POST /auth/pair → 400 invalid_request (shape mirrors error.invalid_request.json).
         server.enqueueFixture("error-invalid-code.json", code = 400)
@@ -220,6 +228,15 @@ class AuthJourneyTest {
         composeRule.onNodeWithTag("field-server-url").performTextReplacement(server.baseUrl)
         composeRule.onNodeWithTag("field-pair-code").performTextReplacement("AbC12345")
         composeRule.onNodeWithTag("action-pair").performClick()
+        // Pairing is async (pair -> me -> store): wait for it to leave Pair or fail inline.
+        composeRule.waitUntil(PAIR_TIMEOUT_MS) {
+            composeRule.onAllNodesWithTag("screen-pair").fetchSemanticsNodes().isEmpty() ||
+                composeRule.onAllNodesWithTag("pair-error").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.waitForIdle()
+    }
+
+    private companion object {
+        const val PAIR_TIMEOUT_MS = 10_000L
     }
 }
