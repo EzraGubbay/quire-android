@@ -99,9 +99,7 @@ class ChatJourneyTest {
 
     // --- Thread lists: un-ignored by QMOB-E6-S2 (#45) -------------------------------------------
 
-    // un-ignored by QMOB-E6-S2 (#45)
     @Test
-    @Ignore("QMOB-E6")
     fun chatsTab_listsRecentThreads() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT) // GET /threads
@@ -115,9 +113,7 @@ class ChatJourneyTest {
         composeRule.onNodeWithTag("thread-row-$THREAD_ID").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E6-S2 (#45)
     @Test
-    @Ignore("QMOB-E6")
     fun courseScreen_askEntryPoint_opensThatCoursesThreads() {
         enqueueCourses()
         enqueueCourseDetail()
@@ -131,9 +127,7 @@ class ChatJourneyTest {
         composeRule.onNodeWithTag("thread-row-$THREAD_ID").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E6-S2 (#45)
     @Test
-    @Ignore("QMOB-E6")
     fun chatsTab_newThread_opensEmptyConversation() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
@@ -150,9 +144,7 @@ class ChatJourneyTest {
         composeRule.onNodeWithTag("chat-input").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E6-S2 (#45)
     @Test
-    @Ignore("QMOB-E6")
     fun chatsTab_offline_showsCachedListWithBanner() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT) // one success populates the Room cache
