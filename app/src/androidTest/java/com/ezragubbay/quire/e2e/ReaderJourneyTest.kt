@@ -305,6 +305,7 @@ class ReaderJourneyTest {
         awaitTag("pdf-page-1")
         composeRule.onNodeWithTag("viewer-download-toggle").performClick()
         awaitTag("download-state-failed")
+        enqueueCourses() // returning to the courses list refreshes it; keep that from eating the retry's PDF
         pressBack()
 
         // A failed download surfaces a failed state with a retry; retrying re-enqueues the work.
