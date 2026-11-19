@@ -15,6 +15,8 @@ style:
   MagicNumber:
     ignorePropertyDeclaration: true
     ignoreAnnotated: ['Preview']
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
 
 complexity:
   LongParameterList:
