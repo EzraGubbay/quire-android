@@ -11,4 +11,9 @@ interface BrowseApi {
     suspend fun files(slug: String): ApiResult<List<CourseFileDto>>
 
     suspend fun notes(slug: String): ApiResult<List<NoteDto>>
+
+    suspend fun note(
+        slug: String,
+        noteId: String,
+    ): ApiResult<NoteDetailDto>
 }

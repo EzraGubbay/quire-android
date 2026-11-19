@@ -60,6 +60,11 @@ class DefaultPairerTest {
         override suspend fun files(slug: String) = error("unused")
 
         override suspend fun notes(slug: String) = error("unused")
+
+        override suspend fun note(
+            slug: String,
+            noteId: String,
+        ) = error("unused")
     }
 
     private fun error(code: Int): Response<Nothing> =

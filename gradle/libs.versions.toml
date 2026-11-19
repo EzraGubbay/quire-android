@@ -27,6 +27,7 @@ zxing = "3.5.3"
 room = "2.8.1"
 work = "2.10.5"
 turbine = "1.2.1"
+markwon = "4.6.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -75,6 +76,8 @@ androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 junit = { module = "junit:junit", version.ref = "junit" }
+markwon-core = { module = "io.noties.markwon:core", version.ref = "markwon" }
+markwon-ext-latex = { module = "io.noties.markwon:ext-latex", version.ref = "markwon" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
