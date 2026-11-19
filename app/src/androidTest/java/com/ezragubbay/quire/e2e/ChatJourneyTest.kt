@@ -353,7 +353,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S6 (#49) — removes the last Ignore, closing the epic
     @Test
-    @Ignore("QMOB-E6")
     fun viewer_askAboutDocument_opensDocumentScopedChat() {
         enqueueCourses()
         enqueueCourseDetail()
@@ -374,7 +373,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S6 (#49)
     @Test
-    @Ignore("QMOB-E6")
     fun threadList_documentThread_carriesDocumentBadge() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT) // includes a document-scoped thread

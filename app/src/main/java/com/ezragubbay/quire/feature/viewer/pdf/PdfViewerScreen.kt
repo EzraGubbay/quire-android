@@ -84,6 +84,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.download.DownloadState
+import com.ezragubbay.quire.feature.chat.ask.AskAboutDocumentViewModel
 import com.ezragubbay.quire.feature.viewer.DownloadIndicator
 import com.ezragubbay.quire.feature.viewer.DownloadToggle
 import com.ezragubbay.quire.feature.viewer.FORMAT_PDF
@@ -102,7 +103,9 @@ private const val INDICATOR_ALPHA = 0.92f
 @Composable
 fun PdfViewerScreen(
     onBack: () -> Unit,
+    onAskAboutDocument: (courseSlug: String, threadId: String, documentTitle: String) -> Unit,
     viewModel: PdfViewerViewModel = hiltViewModel(),
+    askViewModel: AskAboutDocumentViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val zoom by viewModel.zoom.collectAsStateWithLifecycle()
@@ -114,6 +117,10 @@ fun PdfViewerScreen(
         viewModel.openWithRequests.collect { request ->
             if (!OpenWithLauncher.launch(context, request)) viewModel.onNoAppFound()
         }
+    }
+    val onAsk by rememberUpdatedState(onAskAboutDocument)
+    LaunchedEffect(askViewModel) {
+        askViewModel.requests.collect { onAsk(it.courseSlug, it.threadId, it.documentTitle) }
     }
     val scope = rememberCoroutineScope()
     val shareTarget by viewModel.shareTarget.collectAsStateWithLifecycle()
@@ -147,6 +154,7 @@ fun PdfViewerScreen(
         downloadState = downloadState,
         onToggleDownload = viewModel::toggleDownload,
         onOpenWith = viewModel::openWith,
+        onAsk = askViewModel::ask,
         zoom = zoom,
         immersive = immersive,
         onBack = onBack,
@@ -168,6 +176,7 @@ internal fun PdfViewerContent(
     downloadState: DownloadState,
     onToggleDownload: () -> Unit,
     onOpenWith: () -> Unit,
+    onAsk: () -> Unit,
     zoom: ZoomState,
     immersive: Boolean,
     onBack: () -> Unit,
@@ -197,6 +206,9 @@ internal fun PdfViewerContent(
                     actions = {
                         if (ready != null) {
                             DownloadActions(downloadState, onToggleDownload)
+                            TextButton(onClick = onAsk, modifier = Modifier.testTag("action-ask-about-doc")) {
+                                Text(stringResource(R.string.viewer_ask))
+                            }
                             if (canShare) {
                                 IconButton(onClick = onShare, modifier = Modifier.testTag("action-share")) {
                                     Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.viewer_share))

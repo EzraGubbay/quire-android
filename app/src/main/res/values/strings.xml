@@ -122,6 +122,8 @@
     <string name="conversation_error_network">The connection dropped. Your question was kept \u2014 tap Retry.</string>
     <string name="conversation_error_provider">The AI provider ran into a problem. Tap Retry to ask again.</string>
     <string name="conversation_history_error">Could not load this conversation.</string>
+    <string name="conversation_doc_header">About: %1$s</string>
+    <string name="viewer_ask">Ask</string>
     <string name="viewer_back">Back</string>
     <string name="viewer_title">Document</string>
     <string name="viewer_jump">Go to page</string>

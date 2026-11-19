@@ -34,10 +34,12 @@ data class CourseThreadsRoute(
 
 /**
  * The chat conversation for [threadId] of course [courseSlug]; pushed over the shell from a thread row, or after
- * "New chat" created the thread (the thread is created first, then this route opens on its id).
+ * "New chat" created the thread (the thread is created first, then this route opens on its id). [documentTitle] is set
+ * when opened from the viewer's 'Ask about this document': the conversation then shows a header naming it.
  */
 @Serializable
 data class ConversationRoute(
     val courseSlug: String,
     val threadId: String,
+    val documentTitle: String? = null,
 )

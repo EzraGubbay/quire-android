@@ -72,10 +72,19 @@ const val CHAT_OFFLINE_BANNER_TAG = "chat-offline-banner"
 @Composable
 fun ConversationScreen(
     onBack: () -> Unit,
+    documentHeader: (@Composable () -> Unit)? = null,
     viewModel: ConversationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ConversationContent(state, onBack, viewModel::send, viewModel::stop, viewModel::retryHistory, viewModel::retry)
+    ConversationContent(
+        state,
+        onBack,
+        viewModel::send,
+        viewModel::stop,
+        viewModel::retryHistory,
+        viewModel::retry,
+        documentHeader,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -87,6 +96,7 @@ internal fun ConversationContent(
     onStop: () -> Unit,
     onRetryHistory: () -> Unit,
     onRetry: () -> Unit,
+    documentHeader: (@Composable () -> Unit)? = null,
 ) {
     Scaffold(
         modifier = Modifier.testTag(CONVERSATION_TAG).imePadding(),
@@ -106,6 +116,7 @@ internal fun ConversationContent(
         bottomBar = { Composer(state.streaming, !state.offline, onSend, onStop) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
+            documentHeader?.invoke()
             if (state.offline) OfflineBanner()
             if (state.historyFailed) {
                 ErrorState(stringResource(R.string.conversation_history_error), onRetry = onRetryHistory)
