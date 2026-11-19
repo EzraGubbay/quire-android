@@ -6,11 +6,16 @@ import java.security.GeneralSecurityException
 class FakeCipher : SecretCipher {
     var failDecrypt = false
 
-    override fun encrypt(plain: ByteArray): ByteArray = byteArrayOf(MARKER) + plain.reversedArray().map { (it.toInt() xor MASK).toByte() }
+    override fun encrypt(plain: ByteArray): ByteArray =
+        byteArrayOf(MARKER) + plain.reversedArray().map { (it.toInt() xor MASK).toByte() }
 
     override fun decrypt(blob: ByteArray): ByteArray {
         if (failDecrypt || blob.isEmpty() || blob[0] != MARKER) throw GeneralSecurityException("fake decrypt failure")
-        return blob.drop(1).map { (it.toInt() xor MASK).toByte() }.toByteArray().reversedArray()
+        return blob
+            .drop(1)
+            .map { (it.toInt() xor MASK).toByte() }
+            .toByteArray()
+            .reversedArray()
     }
 
     private companion object {

@@ -52,7 +52,10 @@ class SessionRepositoryTest {
             repo.signInDefault()
             assertEquals(SessionState.SignedIn(SERVER, "ezra", "Pixel 9"), repo.current())
             assertEquals(TOKEN, repo.token())
-            assertEquals(SessionState.SignedIn(SERVER, "ezra", "Pixel 9"), repo.state.first { it is SessionState.SignedIn })
+            assertEquals(
+                SessionState.SignedIn(SERVER, "ezra", "Pixel 9"),
+                repo.state.first { it is SessionState.SignedIn },
+            )
         }
 
     @Test
@@ -69,7 +72,13 @@ class SessionRepositoryTest {
     @Test
     fun restore_survivesNewRepositoryOverSameFile() =
         runBlocking {
-            repo().signInDefault()
+            // Simulate a process restart: the first DataStore must be closed before another opens the same file.
+            val firstScope = CoroutineScope(Dispatchers.IO)
+            val first =
+                SessionRepository(PreferenceDataStoreFactory.create(scope = firstScope) { file }, cipher, firstScope)
+            first.signInDefault()
+            firstScope.cancel()
+            firstScope.coroutineContext[kotlinx.coroutines.Job]?.join()
             val restored = SessionRepository(store(), cipher, scope)
             assertEquals(SessionState.SignedIn(SERVER, "ezra", "Pixel 9"), restored.current())
             assertEquals(TOKEN, restored.token())
@@ -121,7 +130,10 @@ class SessionRepositoryTest {
     fun decryptableButMalformedJson_resolvesToSignedOut() =
         runBlocking {
             val dataStore = store()
-            val blob = java.util.Base64.getEncoder().encodeToString(cipher.encrypt("{nope".toByteArray()))
+            val blob =
+                java.util.Base64
+                    .getEncoder()
+                    .encodeToString(cipher.encrypt("{nope".toByteArray()))
             dataStore.edit { it[stringPreferencesKey("session_blob")] = blob }
             assertEquals(SessionState.SignedOut, repo(dataStore).current())
         }
