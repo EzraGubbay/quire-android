@@ -33,8 +33,10 @@ class DesignSystemScreenshotTest(
     }
 
     private companion object {
-        /** Small tolerance so goldens recorded on macOS pass on Linux CI (font anti-aliasing). */
-        // Built lazily: RoborazziOptions needs the Robolectric sandbox, which does not exist while parameters load.
+        /**
+         * Small tolerance so goldens recorded on macOS pass on Linux CI (font anti-aliasing). Built lazily because
+         * `RoborazziOptions` needs the Robolectric sandbox, which does not exist while parameters load.
+         */
         fun tolerantOptions() =
             RoborazziOptions(compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.01f))
 
