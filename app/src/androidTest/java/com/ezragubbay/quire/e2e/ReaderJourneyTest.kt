@@ -14,18 +14,28 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Configuration
+import androidx.work.ListenableWorker
+import androidx.work.WorkManager
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
 import com.ezragubbay.quire.MainActivity
+import com.ezragubbay.quire.core.database.QuireDatabase
+import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import javax.inject.Inject
 
 /**
  * Epic e2e journey for QMOB-E5 (reader: downloads, PDF viewer, open-file, downloads library, share,
@@ -81,7 +91,34 @@ class ReaderJourneyTest {
     @get:Rule(order = 3)
     val composeRule = createEmptyComposeRule()
 
+    @Inject lateinit var db: QuireDatabase
+
+    @Inject lateinit var workerFactory: DownloadWorkerFactory
+
     private var scenario: ActivityScenario<MainActivity>? = null
+
+    /** Each case starts with no persisted downloads and an empty viewer cache (state survives between cases). */
+    @Before
+    fun resetOfflineState() {
+        hilt.inject()
+        // HiltTestApplication is not a WorkManager Configuration.Provider, so wire the download worker factory here.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        // WorkManager initialises once per process, but each case has a fresh Hilt graph (and Room instance), so the
+        // factory it holds delegates to the current case's factory.
+        currentWorkerFactory = workerFactory
+        runCatching {
+            WorkManager.initialize(context, Configuration.Builder().setWorkerFactory(DelegatingWorkerFactory).build())
+        } // already initialised by an earlier case in this process
+        WorkManager
+            .getInstance(context)
+            .cancelAllWork()
+            .result
+            .get() // no download work leaks between cases
+        // Direct DAO/file reset: going through DownloadRepository would touch WorkManager before the app starts.
+        runBlocking { db.downloadDao().deleteAll() }
+        context.cacheDir.resolve("viewer").deleteRecursively()
+        context.filesDir.resolve("downloads").deleteRecursively()
+    }
 
     @After
     fun closeScenario() {
@@ -145,7 +182,7 @@ class ReaderJourneyTest {
 
         // ...reopen the same file: the last-read page (persisted in Room) is restored.
         enqueuePdf() // reopening may re-stream to the cache
-        openLectureFile()
+        reopenLectureFile()
         awaitTag("pdf-page-3")
         composeRule.onNodeWithTag("pdf-page-3").assertIsDisplayed()
     }
@@ -153,7 +190,6 @@ class ReaderJourneyTest {
     // --- Open-file flow (stream-to-cache, download toggle, open-with): QMOB-E5-S3 (#38) ---------
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun tapFile_streamsContentToCache_thenShowsViewer() {
         enqueueReaderBundle()
@@ -169,7 +205,6 @@ class ReaderJourneyTest {
     }
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun viewer_toggleDownload_persistsOffline_reachesDoneState() {
         enqueueReaderBundle()
@@ -185,7 +220,6 @@ class ReaderJourneyTest {
     }
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun downloadedFile_opensWithServerDown() {
         enqueueReaderBundle()
@@ -198,13 +232,12 @@ class ReaderJourneyTest {
 
         // With the file downloaded the server can vanish; reopening still renders from disk.
         server.server.shutdown()
-        openLectureFile()
+        reopenLectureFile()
         awaitTag("pdf-page-1")
         composeRule.onNodeWithTag("pdf-page-1").assertIsDisplayed()
     }
 
     // un-ignored by QMOB-E5-S3 (#38)
-    @Ignore("QMOB-E5")
     @Test
     fun originalOnlyFile_offersOpenWith() {
         enqueueCourses()
@@ -232,6 +265,7 @@ class ReaderJourneyTest {
         pressBack()
 
         // The Downloads tab lists the downloaded file (with size) and shows total storage used.
+        pressBack() // course screen -> courses list, where the bottom bar lives
         composeRule.onNodeWithTag("nav-downloads").performClick()
         composeRule.onNodeWithTag("screen-downloads").assertIsDisplayed()
         awaitTag("download-row-$LECTURE_FILE_ID")
@@ -250,6 +284,7 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("viewer-download-toggle").performClick()
         awaitTag("download-state-done")
         pressBack()
+        pressBack() // course screen -> courses list, where the bottom bar lives
         composeRule.onNodeWithTag("nav-downloads").performClick()
         awaitTag("download-row-$LECTURE_FILE_ID")
 
@@ -263,11 +298,18 @@ class ReaderJourneyTest {
     fun downloadsTab_retryFailedDownload_restarts() {
         enqueueCourses()
         enqueueCourseDetail()
-        server.enqueueFixture("error-not-found.json", code = 404) // the first content fetch fails
+        enqueuePdf() // viewing streams to cache (not a download)
+        server.enqueueFixture("error-not-found.json", code = 404) // the persisted download fails
         launch()
         openLectureFile()
+        awaitTag("pdf-page-1")
+        composeRule.onNodeWithTag("viewer-download-toggle").performClick()
+        awaitTag("download-state-failed")
+        enqueueCourses() // returning to the courses list refreshes it; keep that from eating the retry's PDF
+        pressBack()
 
         // A failed download surfaces a failed state with a retry; retrying re-enqueues the work.
+        pressBack() // course screen -> courses list, where the bottom bar lives
         composeRule.onNodeWithTag("nav-downloads").performClick()
         awaitTag("download-row-$LECTURE_FILE_ID")
         composeRule.onNodeWithTag("download-state-failed").assertIsDisplayed()
@@ -363,7 +405,8 @@ class ReaderJourneyTest {
     private fun enqueueReaderBundle() {
         enqueueCourses()
         enqueueCourseDetail()
-        enqueuePdf()
+        enqueuePdf() // the stream-to-cache view
+        enqueuePdf() // the persisted download, when a case toggles it on
     }
 
     /** The next recorded request to the file-content endpoint, skipping browse/session calls. */
@@ -400,6 +443,13 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("file-row-$LECTURE_FILE_ID").performClick()
     }
 
+    /** After backing out of the viewer we are still on the course screen: re-select Files and tap the row. */
+    private fun reopenLectureFile() {
+        composeRule.onNodeWithTag("tab-files").performClick()
+        awaitTag("file-list")
+        composeRule.onNodeWithTag("file-row-$LECTURE_FILE_ID").performClick()
+    }
+
     /** Dispatches a system back press (on the activity's main thread), then lets recomposition settle. */
     private fun pressBack() {
         scenario?.onActivity { it.onBackPressedDispatcher.onBackPressed() }
@@ -413,7 +463,17 @@ class ReaderJourneyTest {
         }
     }
 
+    private object DelegatingWorkerFactory : WorkerFactory() {
+        override fun createWorker(
+            appContext: Context,
+            workerClassName: String,
+            workerParameters: WorkerParameters,
+        ): ListenableWorker? = currentWorkerFactory?.createWorker(appContext, workerClassName, workerParameters)
+    }
+
     private companion object {
+        @Volatile var currentWorkerFactory: DownloadWorkerFactory? = null
+
         const val TIMEOUT_MS = 10_000L
         const val DECK_PDF = "lecture-1.pdf"
         const val LECTURE_FILE_ID = "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
