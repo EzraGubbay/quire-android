@@ -78,6 +78,11 @@ class AppViewModelTest {
         override suspend fun files(slug: String) = error("unused")
 
         override suspend fun notes(slug: String) = error("unused")
+
+        override suspend fun note(
+            slug: String,
+            noteId: String,
+        ) = error("unused")
     }
 
     private val api = FakeApi()

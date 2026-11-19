@@ -42,4 +42,10 @@ interface QuireApi {
     suspend fun notes(
         @Path("course") slug: String,
     ): Response<List<NoteDto>>
+
+    @GET("courses/{course}/notes/{noteId}")
+    suspend fun note(
+        @Path("course") slug: String,
+        @Path("noteId") noteId: String,
+    ): Response<NoteDetailDto>
 }

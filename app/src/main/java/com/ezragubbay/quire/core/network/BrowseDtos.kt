@@ -85,3 +85,13 @@ data class NoteDto(
     val session: NoteSessionRefDto? = null,
     val updatedAt: String = "",
 )
+
+/** `GET /courses/{course}/notes/{noteId}`: one note with its raw Markdown body. */
+@Serializable
+data class NoteDetailDto(
+    val id: String,
+    val slug: String,
+    val title: String,
+    val updatedAt: String = "",
+    val markdown: String = "",
+)

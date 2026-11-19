@@ -104,6 +104,9 @@
     <string name="files_format_pdf">PDF</string>
     <string name="files_format_original">Original</string>
     <string name="files_format_markdown">Markdown</string>
+    <string name="note_reader_title">Note</string>
+    <string name="note_reader_back">Back</string>
+    <string name="note_reader_error">Could not open this note.</string>
     <string name="viewer_back">Back</string>
     <string name="viewer_title">Document</string>
     <string name="viewer_jump">Go to page</string>
