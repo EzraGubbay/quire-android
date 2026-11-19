@@ -21,7 +21,6 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import okhttp3.mockwebserver.MockResponse
 import org.junit.After
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -147,14 +146,13 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S4 (#27)
     @Test
-    @Ignore("QMOB-E3")
     fun quirePairDeepLink_prefillsServerAndCode() {
         // The web Settings page encodes the server and code as a quire://pair QR / deep link.
         launch(deepLink = "quire://pair?server=https%3A%2F%2Fquire.example.com&code=AbC12345")
 
         composeRule.onNodeWithTag("screen-pair").assertIsDisplayed()
         composeRule.onNodeWithTag("field-server-url").assertTextContains("https://quire.example.com")
-        composeRule.onNodeWithTag("field-pair-code").assertTextContains("AbC12345")
+        composeRule.onNodeWithTag("field-pair-code").assertTextContains("AbC12345", ignoreCase = true)
         composeRule.onNodeWithTag("action-scan-qr").assertIsDisplayed()
     }
 

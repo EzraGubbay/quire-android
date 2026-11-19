@@ -13,15 +13,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -41,23 +47,51 @@ const val FIELD_SERVER_URL_TAG = "field-server-url"
 const val FIELD_PAIR_CODE_TAG = "field-pair-code"
 const val FIELD_DEVICE_NAME_TAG = "field-device-name"
 const val ACTION_PAIR_TAG = "action-pair"
+const val ACTION_SCAN_QR_TAG = "action-scan-qr"
 const val PAIR_ERROR_TAG = "pair-error"
 
-/** Pairing form. [onPaired] runs once the session is stored; the caller owns navigation. */
+/**
+ * Pairing form. [onPaired] runs once the session is stored; the caller owns navigation. When [replacesSession]
+ * (already signed in) submitting first asks for confirmation.
+ */
 @Composable
 fun PairScreen(
     viewModel: PairViewModel,
     onPaired: () -> Unit,
+    onScanQr: () -> Unit,
+    replacesSession: Boolean = false,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var confirming by remember { mutableStateOf(false) }
+    val requestPair = { if (replacesSession) confirming = true else viewModel.onPair() }
     LaunchedEffect(viewModel) { viewModel.paired.collect { onPaired() } }
+    LaunchedEffect(viewModel) { viewModel.submitRequests.collect { requestPair() } }
     PairContent(
         state = state,
         onServerUrlChange = viewModel::onServerUrlChange,
         onCodeChange = viewModel::onCodeChange,
         onDeviceNameChange = viewModel::onDeviceNameChange,
-        onPair = viewModel::onPair,
+        onPair = requestPair,
+        onScanQr = onScanQr,
     )
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text(stringResource(R.string.pair_replace_title)) },
+            text = { Text(stringResource(R.string.pair_replace_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirming = false
+                        viewModel.onPair()
+                    },
+                ) { Text(stringResource(R.string.pair_replace_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirming = false }) { Text(stringResource(R.string.pair_replace_cancel)) }
+            },
+        )
+    }
 }
 
 @Composable
@@ -67,6 +101,7 @@ fun PairContent(
     onCodeChange: (String) -> Unit,
     onDeviceNameChange: (String) -> Unit,
     onPair: () -> Unit,
+    onScanQr: () -> Unit = {},
 ) {
     val spacing = QuireTheme.spacing
     Surface(modifier = Modifier.fillMaxSize().testTag(SCREEN_PAIR_TAG)) {
@@ -81,6 +116,11 @@ fun PairContent(
         ) {
             Text(stringResource(R.string.pair_title), style = MaterialTheme.typography.headlineMedium)
             Text(stringResource(R.string.pair_subtitle), style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(
+                onClick = onScanQr,
+                enabled = !state.loading,
+                modifier = Modifier.fillMaxWidth().testTag(ACTION_SCAN_QR_TAG),
+            ) { Text(stringResource(R.string.pair_scan_qr)) }
             OutlinedTextField(
                 value = state.serverUrl,
                 onValueChange = onServerUrlChange,
