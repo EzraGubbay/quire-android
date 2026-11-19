@@ -104,4 +104,16 @@
     <string name="files_format_pdf">PDF</string>
     <string name="files_format_original">Original</string>
     <string name="files_format_markdown">Markdown</string>
+    <string name="downloads_empty_title">No downloads yet</string>
+    <string name="downloads_empty_message">Files you save for offline reading appear here.</string>
+    <string name="downloads_storage_used">Storage used: %1$s</string>
+    <string name="downloads_remove_all">Remove all</string>
+    <string name="downloads_remove_all_title">Remove all downloads?</string>
+    <string name="downloads_remove_all_message">Downloaded files are deleted from this phone. They stay on your server.</string>
+    <string name="downloads_cancel">Cancel</string>
+    <string name="downloads_remove">Remove</string>
+    <string name="downloads_retry">Retry</string>
+    <string name="downloads_state_downloading">Downloading %1$s</string>
+    <string name="downloads_state_done">Downloaded - %1$s</string>
+    <string name="downloads_state_failed">Failed: %1$s</string>
 </resources>
