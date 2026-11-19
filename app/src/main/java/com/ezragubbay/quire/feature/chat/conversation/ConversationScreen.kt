@@ -47,7 +47,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,6 +65,8 @@ const val ACTION_STOP_TAG = "action-stop"
 const val ANSWER_MARKDOWN_TAG = "answer-markdown"
 const val ANSWER_MATH_TAG = "answer-math"
 const val CHAT_ERROR_TAG = "chat-error"
+const val ACTION_RETRY_TAG = "action-retry"
+const val CHAT_OFFLINE_BANNER_TAG = "chat-offline-banner"
 
 /** The chat conversation: history, then live streaming answers with Stop; answers render Markdown + block math. */
 @Composable
@@ -75,7 +76,15 @@ fun ConversationScreen(
     viewModel: ConversationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ConversationContent(state, onBack, viewModel::send, viewModel::stop, viewModel::retryHistory, documentHeader)
+    ConversationContent(
+        state,
+        onBack,
+        viewModel::send,
+        viewModel::stop,
+        viewModel::retryHistory,
+        viewModel::retry,
+        documentHeader,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +95,7 @@ internal fun ConversationContent(
     onSend: (String) -> Unit,
     onStop: () -> Unit,
     onRetryHistory: () -> Unit,
+    onRetry: () -> Unit,
     documentHeader: (@Composable () -> Unit)? = null,
 ) {
     Scaffold(
@@ -103,14 +113,15 @@ internal fun ConversationContent(
                 },
             )
         },
-        bottomBar = { Composer(state.streaming, onSend, onStop) },
+        bottomBar = { Composer(state.streaming, !state.offline, onSend, onStop) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             documentHeader?.invoke()
+            if (state.offline) OfflineBanner()
             if (state.historyFailed) {
                 ErrorState(stringResource(R.string.conversation_history_error), onRetry = onRetryHistory)
             } else {
-                MessageList(state, Modifier.weight(1f))
+                MessageList(state, onRetry, Modifier.weight(1f))
             }
         }
     }
@@ -119,6 +130,7 @@ internal fun ConversationContent(
 @Composable
 private fun MessageList(
     state: ConversationUiState,
+    onRetry: () -> Unit,
     modifier: Modifier,
 ) {
     val bubbles = state.bubbles
@@ -142,11 +154,7 @@ private fun MessageList(
             }
             if (state.error != null) {
                 item(key = "error") {
-                    Text(
-                        text = state.error,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag(CHAT_ERROR_TAG),
-                    )
+                    ChatErrorRow(state.error, onRetry)
                 }
             }
         }
@@ -158,6 +166,48 @@ private fun MessageList(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).testTag("action-jump-latest"),
             )
         }
+    }
+}
+
+@Composable
+private fun ChatErrorRow(
+    failure: ChatFailure,
+    onRetry: () -> Unit,
+) {
+    Column {
+        Text(
+            text = stringResource(failure.messageRes()),
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.testTag(CHAT_ERROR_TAG),
+        )
+        if (failure.retryable) {
+            TextButton(onClick = onRetry, modifier = Modifier.testTag(ACTION_RETRY_TAG)) {
+                Text(stringResource(R.string.conversation_retry))
+            }
+        }
+    }
+}
+
+private fun ChatFailure.messageRes(): Int =
+    when (this) {
+        ChatFailure.Budget -> R.string.conversation_error_budget
+        ChatFailure.AiUnavailable -> R.string.conversation_error_ai_unavailable
+        ChatFailure.Network -> R.string.conversation_error_network
+        ChatFailure.Provider -> R.string.conversation_error_provider
+    }
+
+@Composable
+private fun OfflineBanner() {
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag(CHAT_OFFLINE_BANNER_TAG),
+    ) {
+        Text(
+            stringResource(R.string.conversation_offline),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -235,6 +285,7 @@ private fun AnswerBody(markdown: String) {
 @Composable
 private fun Composer(
     streaming: Boolean,
+    enabled: Boolean,
     onSend: (String) -> Unit,
     onStop: () -> Unit,
 ) {
@@ -247,6 +298,7 @@ private fun Composer(
             value = text,
             onValueChange = { text = it },
             placeholder = { Text(stringResource(R.string.conversation_input_hint)) },
+            enabled = enabled,
             maxLines = MAX_INPUT_LINES,
             modifier = Modifier.weight(1f).testTag(CHAT_INPUT_TAG),
         )
@@ -260,7 +312,7 @@ private fun Composer(
                 onSend(text)
                 text = ""
             },
-            enabled = text.isNotBlank() && !streaming,
+            enabled = enabled && text.isNotBlank() && !streaming,
             modifier = Modifier.testTag(ACTION_SEND_TAG),
         ) {
             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.conversation_send))
@@ -269,21 +321,3 @@ private fun Composer(
 }
 
 private const val MAX_INPUT_LINES = 5
-
-/** Names the document a document-scoped conversation is about. */
-@Composable
-fun DocumentHeader(title: String) {
-    Text(
-        text = stringResource(R.string.conversation_doc_header, title),
-        style = MaterialTheme.typography.labelLarge,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 8.dp,
-                ).testTag("conversation-doc-header"),
-    )
-}
