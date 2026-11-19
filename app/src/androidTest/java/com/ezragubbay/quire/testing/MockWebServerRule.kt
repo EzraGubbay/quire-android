@@ -51,6 +51,31 @@ class MockWebServerRule(
         requireNotNull(server.takeRequest(timeoutSeconds, TimeUnit.SECONDS)) { "No request received" }
 
     /**
+     * Queue an NDJSON fixture [name] as the `application/x-ndjson` body of a streaming response
+     * (`POST .../threads/{id}/messages`), mirroring the `mobile-v1` chat contract: one JSON event per
+     * line (`user`, zero or more `delta`, then `done` or `error`). The body is delivered **chunked and
+     * throttled** ([bytesPerPeriod] every [periodMs]) so the client observes the answer arriving
+     * incrementally — the E6 journey asserts the assistant text settling, not a single atomic body.
+     * `code` stays `200` even for a mid-stream `error` event (a provider failure after the stream
+     * started); pre-stream failures use the JSON error envelope via [enqueueFixture] with a 4xx/5xx code.
+     */
+    fun enqueueNdjsonFixture(
+        name: String,
+        code: Int = 200,
+        bytesPerPeriod: Long = 16,
+        periodMs: Long = 20,
+    ) {
+        val body = readFixture(name)
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(code)
+                .setHeader("Content-Type", "application/x-ndjson")
+                .setChunkedBody(body, CHUNK_BYTES)
+                .throttleBody(bytesPerPeriod, periodMs, TimeUnit.MILLISECONDS),
+        )
+    }
+
+    /**
      * Queue a binary asset [name] as a full `200` body for the file-content endpoint, mirroring the
      * `mobile-v1` contract: a strong [etag], `Accept-Ranges: bytes`, a length and a
      * `Content-Disposition` filename. Used by the reader journey for the 5-page PDF deck fixture.
@@ -125,4 +150,9 @@ class MockWebServerRule(
             .context.assets
             .open("$fixtureDir/$name")
             .use { it.readBytes() }
+
+    private companion object {
+        /** Small HTTP chunk size so an NDJSON body is split across reads (delta events arrive separately). */
+        const val CHUNK_BYTES = 16
+    }
 }

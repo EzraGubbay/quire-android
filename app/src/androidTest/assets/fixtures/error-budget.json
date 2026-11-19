@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "budget",
+    "message": "You have reached this month's AI budget"
+  }
+}
