@@ -107,6 +107,15 @@
     <string name="note_reader_title">Note</string>
     <string name="note_reader_back">Back</string>
     <string name="note_reader_error">Could not open this note.</string>
+    <string name="conversation_title">Chat</string>
+    <string name="conversation_back">Back</string>
+    <string name="conversation_input_hint">Ask a question</string>
+    <string name="conversation_send">Send</string>
+    <string name="conversation_stop">Stop</string>
+    <string name="conversation_stopped">Stopped</string>
+    <string name="conversation_copy">Copy answer</string>
+    <string name="conversation_jump_latest">Jump to latest</string>
+    <string name="conversation_history_error">Could not load this conversation.</string>
     <string name="viewer_back">Back</string>
     <string name="viewer_title">Document</string>
     <string name="viewer_jump">Go to page</string>

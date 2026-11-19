@@ -29,7 +29,7 @@ import com.ezragubbay.quire.APP_ROOT_TAG
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
-import com.ezragubbay.quire.feature.chat.conversation.ConversationPlaceholder
+import com.ezragubbay.quire.feature.chat.conversation.ConversationScreen
 import com.ezragubbay.quire.feature.chat.threads.CourseThreadsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
@@ -131,10 +131,9 @@ fun AppShell(
                     onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) },
                 )
             }
-            // E6-S2 skeleton: the real conversation screen (E6-S3) replaces this placeholder destination.
-            composable<ConversationRoute> { ConversationPlaceholder(onBack = { navController.popBackStack() }) }
             composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
             composable<NoteReaderRoute> { NoteReaderScreen(onBack = { navController.popBackStack() }) }
+            composable<ConversationRoute> { ConversationScreen(onBack = { navController.popBackStack() }) }
             composable<SearchRoute> {
                 SearchScreen(
                     onBack = { navController.popBackStack() },
