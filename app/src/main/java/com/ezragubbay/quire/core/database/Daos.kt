@@ -123,3 +123,37 @@ abstract class NoteDao {
         insertAll(rows)
     }
 }
+
+@Dao
+abstract class SearchDao {
+    /**
+     * Cached courses whose name or code contains [pattern] (a [escapeLike]-escaped fragment), case-insensitively
+     * (SQLite `LIKE` folds ASCII; Hebrew has no case). Prefix matches rank before substring matches.
+     */
+    @Query(
+        "SELECT * FROM courses WHERE name LIKE '%' || :pattern || '%' ESCAPE '\\' " +
+            "OR code LIKE '%' || :pattern || '%' ESCAPE '\\' " +
+            "ORDER BY CASE WHEN name LIKE :pattern || '%' ESCAPE '\\' " +
+            "OR code LIKE :pattern || '%' ESCAPE '\\' THEN 0 ELSE 1 END, " +
+            "semesterKey DESC, name COLLATE NOCASE LIMIT :limit",
+    )
+    abstract suspend fun searchCourses(
+        pattern: String,
+        limit: Int,
+    ): List<CourseEntity>
+
+    /** Cached files whose title or type label contains [pattern] (see [searchCourses]); prefix matches first. */
+    @Query(
+        "SELECT * FROM files WHERE title LIKE '%' || :pattern || '%' ESCAPE '\\' " +
+            "OR type LIKE '%' || :pattern || '%' ESCAPE '\\' " +
+            "ORDER BY CASE WHEN title LIKE :pattern || '%' ESCAPE '\\' THEN 0 ELSE 1 END, " +
+            "title COLLATE NOCASE LIMIT :limit",
+    )
+    abstract suspend fun searchFiles(
+        pattern: String,
+        limit: Int,
+    ): List<CourseFileEntity>
+}
+
+/** Escapes `\`, `%` and `_` so a user query is matched literally by the `LIKE ... ESCAPE '\'` search queries. */
+fun escapeLike(query: String): String = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

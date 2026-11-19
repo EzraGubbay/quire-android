@@ -264,8 +264,6 @@ class CoursesJourneyTest {
 
     // --- Search: un-ignored by QMOB-E4-S5 (#34) — the last Ignore removed, closing the epic -----
 
-    // un-ignored by QMOB-E4-S5 (#34)
-    @Ignore("QMOB-E4")
     @Test
     fun search_fromCourses_findsFileByTitle() {
         enqueueCourses()

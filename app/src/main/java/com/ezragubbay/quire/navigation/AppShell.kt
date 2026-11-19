@@ -31,6 +31,7 @@ import com.ezragubbay.quire.feature.chat.ChatsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
+import com.ezragubbay.quire.feature.search.SearchScreen
 import com.ezragubbay.quire.feature.settings.SettingsScreen
 
 const val ACTION_SETTINGS_TAG = "action-settings"
@@ -107,7 +108,12 @@ fun AppShell(
                 CoursesScreen(onOpenCourse = { navController.navigate(CourseRoute(it)) })
             }
             composable<CourseRoute> { CourseScreen(onBack = { navController.popBackStack() }) }
-            composable<SearchRoute> { SearchPlaceholder() }
+            composable<SearchRoute> {
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCourse = { navController.navigate(CourseRoute(it)) },
+                )
+            }
             composable<DownloadsRoute> { DownloadsScreen() }
             composable<ChatsRoute> { ChatsScreen() }
             composable<SettingsRoute> {
