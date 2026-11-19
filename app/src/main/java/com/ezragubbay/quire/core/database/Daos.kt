@@ -88,6 +88,10 @@ abstract class FileDao {
     @Query("SELECT * FROM files WHERE courseSlug = :slug")
     abstract suspend fun getForCourse(slug: String): List<CourseFileEntity>
 
+    /** Id and title of every cached file, for labelling Downloads rows. */
+    @Query("SELECT fileId, title FROM files")
+    abstract fun observeTitles(): Flow<List<FileTitle>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     protected abstract suspend fun insertAll(rows: List<CourseFileEntity>)
 
@@ -103,6 +107,12 @@ abstract class FileDao {
         insertAll(rows)
     }
 }
+
+/** Projection of [CourseFileEntity] used to label downloads. */
+data class FileTitle(
+    val fileId: String,
+    val title: String,
+)
 
 @Dao
 abstract class NoteDao {

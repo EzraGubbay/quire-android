@@ -220,8 +220,7 @@ class ReaderJourneyTest {
 
     // --- Downloads tab (offline library, storage, remove / retry): QMOB-E5-S4 (#39) -------------
 
-    // un-ignored by QMOB-E5-S4 (#39)
-    @Ignore("QMOB-E5")
+    // QMOB-E5-S4 (#39)
     @Test
     fun downloadsTab_listsOfflineFile_withSizeAndStorageUse() {
         enqueueReaderBundle()
@@ -241,8 +240,7 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("storage-usage").assertIsDisplayed()
     }
 
-    // un-ignored by QMOB-E5-S4 (#39)
-    @Ignore("QMOB-E5")
+    // QMOB-E5-S4 (#39)
     @Test
     fun downloadsTab_removeFile_removesRow() {
         enqueueReaderBundle()
@@ -260,8 +258,7 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("download-row-$LECTURE_FILE_ID").assertDoesNotExist()
     }
 
-    // un-ignored by QMOB-E5-S4 (#39)
-    @Ignore("QMOB-E5")
+    // QMOB-E5-S4 (#39)
     @Test
     fun downloadsTab_retryFailedDownload_restarts() {
         enqueueCourses()
