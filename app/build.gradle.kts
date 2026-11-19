@@ -57,6 +57,7 @@ android {
 
     testOptions {
         animationsDisabled = true
+        unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.systemProperty("versionPropertiesPath", versionPropertiesFile.absolutePath)
         }
@@ -106,6 +107,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.androidx.test.ext.junit)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
