@@ -31,6 +31,12 @@ android {
         versionCode = loadVersion().code
         versionName = loadVersion().name
         testInstrumentationRunner = "com.ezragubbay.quire.testing.QuireTestRunner"
+        // Wipe app storage between tests. The viewer streams content into <cacheDir>/viewer/<fileId>.pdf
+        // keyed by fileId alone, and that cache (plus the Room DBs / DataStore / download files) otherwise
+        // survives into the next test: a chat journey caching one fixture under a fileId that a later reader
+        // journey reuses with different content served the stale/partial file, so the PDF never rendered.
+        // Requires the orchestrator (execution below) + the test-services APK (androidTestUtil).
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     buildTypes {
@@ -168,6 +174,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestUtil(libs.androidx.test.services)
     // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.okhttp.mockwebserver)
