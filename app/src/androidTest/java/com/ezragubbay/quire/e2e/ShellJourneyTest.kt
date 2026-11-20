@@ -120,10 +120,13 @@ class ShellJourneyTest {
     @Test
     fun systemBack_fromCourses_exitsApp() {
         composeRule.onNodeWithTag("screen-courses").assertIsDisplayed()
+        // Hold the activity before it finishes: once it is destroyed the rule can no longer hand it out
+        // (`composeRule.activity` throws), and how soon that happens after the back press varies run to run.
+        val activity = composeRule.activity
 
         pressSystemBack()
 
-        assertTrue("System back on the start destination must finish the activity", composeRule.activity.isFinishing)
+        assertTrue("System back on the start destination must finish the activity", activity.isFinishing)
     }
 
     // un-ignored by QMOB-E2-S2 (#18)
