@@ -27,9 +27,10 @@ class ChatStreamer
             question: String,
         ): Flow<ChatEvent> =
             channelFlow {
+                val call = api.ask(courseSlug, threadId, PostMessageRequest(question))
                 val response =
                     try {
-                        api.ask(courseSlug, threadId, PostMessageRequest(question))
+                        call.execute()
                     } catch (e: IOException) {
                         send(networkError(e))
                         return@channelFlow
@@ -40,8 +41,10 @@ class ChatStreamer
                     return@channelFlow
                 }
                 launch(Dispatchers.IO) { readBody(body) }
-                // Runs on cancellation of the collector: closing the body unblocks the reader and drops the call.
-                awaitClose { body.close() }
+                // On collector cancellation, cancel the CALL (not body.close()): it closes the socket and makes
+                // the blocked reader throw, WITHOUT okio draining the chunked body on this thread while the
+                // reader still holds the same source's AsyncTimeout (that drain caused "Unbalanced enter/exit").
+                awaitClose { call.cancel() }
             }.flowOn(Dispatchers.IO)
 
         private suspend fun kotlinx.coroutines.channels.ProducerScope<ChatEvent>.readBody(body: ResponseBody) {
@@ -52,11 +55,11 @@ class ChatStreamer
                 // Also thrown after a cancel-induced close; send on a closed channel is a no-op via trySend.
                 trySend(networkError(e))
             } finally {
-                // Do NOT close the body here. awaitClose owns the single body.close() — on normal
-                // completion (after close() below) and on cancel (closing it there is what unblocks the
-                // blocking readUtf8Line above). Closing it from this reader coroutine too raced that close
-                // on another thread and left okio's process-global AsyncTimeout watchdog unbalanced
-                // ("Unbalanced enter/exit"), corrupting every later OkHttp call in the test process.
+                // The reader owns body.close(), so the chunked body's close-time drain runs on the SAME thread
+                // as the read, never concurrently (cancellation aborts the socket via call.cancel() above, then
+                // this close releases it). On normal completion the read has already finished. Either way okio's
+                // AsyncTimeout for this source is only ever entered by one thread.
+                body.close()
                 close()
             }
         }

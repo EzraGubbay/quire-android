@@ -67,13 +67,15 @@ private class FakeStreamApi(
 ) : ChatStreamApi {
     var last: Triple<String, String, String>? = null
 
-    override suspend fun ask(
+    override fun ask(
         courseSlug: String,
         threadId: String,
         body: PostMessageRequest,
-    ): Response<okhttp3.ResponseBody> {
+    ): retrofit2.Call<okhttp3.ResponseBody> {
         last = Triple(courseSlug, threadId, body.question)
-        return Response.success(this.body.toResponseBody("application/x-ndjson".toMediaType()))
+        return retrofit2.mock.Calls.response(
+            Response.success(this.body.toResponseBody("application/x-ndjson".toMediaType())),
+        )
     }
 }
 
