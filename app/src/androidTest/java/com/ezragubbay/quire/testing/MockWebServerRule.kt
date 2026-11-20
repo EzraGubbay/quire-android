@@ -51,6 +51,25 @@ class MockWebServerRule(
         requireNotNull(server.takeRequest(timeoutSeconds, TimeUnit.SECONDS)) { "No request received" }
 
     /**
+     * Blocks until a request whose path ends with [pathSuffix] has reached the server, discarding the recorded
+     * requests before it. Responses are handed out in queue order whatever the path, so a journey calls this to
+     * let a background fetch sequence finish asking before it triggers a request of its own; otherwise that
+     * request can arrive first and be given a response queued for the sequence.
+     */
+    fun awaitRequest(
+        pathSuffix: String,
+        timeoutSeconds: Long = 5,
+    ): RecordedRequest {
+        while (true) {
+            val request =
+                requireNotNull(server.takeRequest(timeoutSeconds, TimeUnit.SECONDS)) {
+                    "No request ending in $pathSuffix received"
+                }
+            if (request.path?.endsWith(pathSuffix) == true) return request
+        }
+    }
+
+    /**
      * Queue an NDJSON fixture [name] as the `application/x-ndjson` body of a streaming response
      * (`POST .../threads/{id}/messages`), mirroring the `mobile-v1` chat contract: one JSON event per
      * line (`user`, zero or more `delta`, then `done` or `error`). The body is delivered **chunked and

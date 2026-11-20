@@ -293,6 +293,9 @@ class CoursesJourneyTest {
         enqueueCourseDetail() // search is served from Room after one successful sync, offline-capable
         launch()
         openSignalsCourse()
+        // Going back refreshes the course list. Let the course's own bundle (detail, sessions, files, notes) finish
+        // asking first, or that refresh can be handed the files response and the file never reaches Room.
+        server.awaitRequest("/notes")
         // Return to Courses so the search action is in scope, then open full-screen search. The course screen
         // hides the shell chrome (no bottom bar), so leave it via its top-bar back arrow rather than nav-courses
         // (which does not exist here); the bottom bar and the Courses search action return once back on the list.
