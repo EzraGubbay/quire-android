@@ -9,6 +9,7 @@ import com.ezragubbay.quire.core.network.ChatEvent
 import com.ezragubbay.quire.core.network.ChatMessageDto
 import com.ezragubbay.quire.core.network.CitationDto
 import com.ezragubbay.quire.core.network.ErrorCode
+import com.ezragubbay.quire.core.network.QuireClient
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -21,7 +22,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -101,6 +101,7 @@ class RepositoryConversationSource
     @Inject
     constructor(
         private val repository: ChatRepository,
+        private val quire: QuireClient,
     ) : ConversationSource {
         override fun observeMessages(
             slug: String,
@@ -119,7 +120,10 @@ class RepositoryConversationSource
         ): Flow<Boolean> =
             flow {
                 while (true) {
-                    val result = repository.observeMessages(slug, threadId).first()
+                    // Reachability only: ping the lightweight `me` endpoint rather than re-fetching the
+                    // whole thread each tick. Re-fetching also raced the conversation's own queued
+                    // responses on-device (FIFO MockWebServer), stealing the stream fixture.
+                    val result = quire.me()
                     emit(result !is ApiResult.Failure.Network)
                     delay(REACHABILITY_INTERVAL_MS)
                 }

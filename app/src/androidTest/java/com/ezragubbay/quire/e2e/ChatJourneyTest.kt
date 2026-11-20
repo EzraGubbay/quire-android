@@ -329,11 +329,9 @@ class ChatJourneyTest {
     fun conversation_offline_disablesComposer_showsBanner() {
         enqueueCourses()
         server.enqueueFixture(CHAT_THREADS_RECENT)
-        // Two history responses: loadHistory() and the reachability probe both GET /messages at init
-        // (order not guaranteed); serving both removes the race. The probe's NEXT poll, after the
-        // shutdown below, is the one that has no response and flips the VM offline.
         server.enqueueFixture(CHAT_MESSAGES_HISTORY)
-        server.enqueueFixture(CHAT_MESSAGES_HISTORY)
+        // The reachability probe pings `/me` (answered out-of-band), so it no longer consumes this
+        // thread's queued responses. After shutdown the probe's next `/me` ping fails → VM goes offline.
         launch()
         openChatsTab()
         awaitTag("thread-list")
