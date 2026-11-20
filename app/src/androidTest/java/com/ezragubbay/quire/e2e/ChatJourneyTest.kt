@@ -119,6 +119,9 @@ class ChatJourneyTest {
         server.enqueueFixture(CHAT_THREADS_COURSE) // GET /courses/{course}/threads
         launch()
         openSignalsCourse()
+        // The course screen is still fetching its detail bundle (detail, sessions, files, notes) when it appears.
+        // Let the last of those requests go out first, or the threads request can be handed one of their responses.
+        server.awaitRequest("/notes")
 
         // The course screen's 'Ask' opens that course's threads.
         composeRule.onNodeWithTag("action-ask").performClick()
