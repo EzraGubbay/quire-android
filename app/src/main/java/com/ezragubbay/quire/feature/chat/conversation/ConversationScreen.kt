@@ -1,5 +1,6 @@
 package com.ezragubbay.quire.feature.chat.conversation
 
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -141,11 +143,32 @@ private fun MessageList(
     val bubbles = state.bubbles
     val listState = rememberLazyListState()
     val atBottom by remember { derivedAtBottom(listState) }
+    val followTail = remember { mutableStateOf(true) }
+    val userDragging = remember { mutableStateOf(false) }
+    // Only a user drag may detach auto-follow; programmatic scrolls emit no drag interaction.
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { interaction ->
+            userDragging.value =
+                when (interaction) {
+                    is DragInteraction.Start -> true
+                    is DragInteraction.Stop, is DragInteraction.Cancel -> false
+                    else -> userDragging.value
+                }
+        }
+    }
+    // Recompute the follow decision off scroll state alone, in an effect — never written during
+    // composition (a remembered-state write in the composition body drove unbounded recomposition +
+    // scroll, corrupting the LazyColumn's subcomposition under throttled streaming: "Unbalanced enter/exit").
+    LaunchedEffect(listState) {
+        snapshotFlow { atBottom to userDragging.value }.collect { (bottom, dragging) ->
+            followTail.value = nextFollowTail(followTail.value, bottom, dragging)
+        }
+    }
+    // Keep the newest content (the last bubble, or the error row) in view as the answer streams in.
     val lastLength = bubbles.lastOrNull()?.text?.length ?: 0
-    var followTail by remember { mutableStateOf(true) }
-    followTail = atBottom || (followTail && listState.isScrollInProgress.not())
-    LaunchedEffect(bubbles.size, lastLength) {
-        if (followTail && bubbles.isNotEmpty()) listState.scrollToItem(bubbles.lastIndex)
+    val itemCount = bubbles.size + if (state.error != null) 1 else 0
+    LaunchedEffect(itemCount, lastLength) {
+        if (followTail.value && itemCount > 0) listState.scrollToItem(itemCount - 1)
     }
     Box(modifier.fillMaxWidth()) {
         LazyColumn(
@@ -155,7 +178,7 @@ private fun MessageList(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             itemsIndexed(bubbles, key = { index, _ -> index }) { index, bubble ->
-                BubbleView(index, bubble, onOpenCitation)
+                BubbleView(index, bubble, state.streaming && index == bubbles.lastIndex, onOpenCitation)
             }
             if (state.error != null) {
                 item(key = "error") {
@@ -222,6 +245,7 @@ private fun derivedAtBottom(listState: LazyListState) = derivedStateOf { !listSt
 private fun BubbleView(
     index: Int,
     bubble: Bubble,
+    streaming: Boolean,
     onOpenCitation: (CitationDto) -> Unit,
 ) {
     val isUser = bubble.role == Role.User
@@ -243,7 +267,7 @@ private fun BubbleView(
                 if (isUser) {
                     SelectionContainer { Text(bubble.text, style = MaterialTheme.typography.bodyLarge) }
                 } else {
-                    AnswerBody(bubble.text)
+                    AnswerBody(bubble.text, settled = !streaming)
                     AnswerCitations(bubble.text, bubble.citations, onOpenCitation)
                     if (bubble.stopped) {
                         Text(
@@ -265,10 +289,16 @@ private const val USER_WIDTH = 0.85f
 
 /** Assistant Markdown via the notes reader's Markwon blocks (ADR 0002): prose runs plus `answer-math` equations. */
 @Composable
-private fun AnswerBody(markdown: String) {
+private fun AnswerBody(
+    markdown: String,
+    settled: Boolean,
+) {
     val markwon = rememberMarkwon()
     val blocks = remember(markdown) { segmentMarkdown(markdown) }
-    Column(Modifier.fillMaxWidth().testTag(ANSWER_MARKDOWN_TAG)) {
+    // `answer-markdown` is the SETTLED-answer contract node (docs/e2e/E6-chat.md): tag it only once the
+    // stream has settled, so a test awaiting it does not race mid-stream deltas — the block-math node and
+    // the citations arrive on the last delta / `done`. The body still renders incrementally while streaming.
+    Column(Modifier.fillMaxWidth().then(if (settled) Modifier.testTag(ANSWER_MARKDOWN_TAG) else Modifier)) {
         blocks.forEach { block ->
             when (block) {
                 is NoteBlock.Text -> BlockView(markwon, block.markdown, Modifier.fillMaxWidth())
