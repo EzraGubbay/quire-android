@@ -230,7 +230,8 @@ class ChatJourneyTest {
         awaitTag("answer-markdown")
 
         // The `[1]` marker is a tappable chip; tapping it opens the cited document in the viewer at its
-        // page (pageNo 7) through the open-file flow, which streams the PDF content on demand.
+        // page (pageNo 4, which must exist in the 5-page deck: the viewer clamps a page past the end to the
+        // last one) through the open-file flow, which streams the PDF content on demand.
         server.enqueuePdfFixture(DECK_PDF)
         composeRule.onNodeWithTag("citation-chip-1").performClick()
         awaitTag("pdf-page-$CITED_PAGE")
@@ -459,7 +460,7 @@ class ChatJourneyTest {
         const val THREAD_ID = "a3c5d7e9-1b2d-4f60-9a8b-7c6d5e4f3a2b"
         const val DOC_THREAD_ID = "b4d6e8f0-2c3e-4a71-8b9c-6d5e4f3a2b1c"
         const val LECTURE_FILE_ID = "6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10"
-        const val CITED_PAGE = 7
+        const val CITED_PAGE = 4
         const val DECK_PDF = "lecture-1.pdf"
 
         const val CHAT_THREADS_RECENT = "chat-threads-recent.json"
