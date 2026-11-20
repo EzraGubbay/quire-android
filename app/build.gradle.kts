@@ -31,7 +31,7 @@ android {
         versionCode = loadVersion().code
         versionName = loadVersion().name
         testInstrumentationRunner = "com.ezragubbay.quire.testing.QuireTestRunner"
-        // Wipe the app's storage after every instrumented test, so each one starts from a fresh install. The Room
+        // Wipe the app's storage after every instrumented test, so no test sees what an earlier one stored. The Room
         // database (reading positions, cached lists, downloads), DataStore, WorkManager and the cache/files dirs
         // otherwise outlive a test: a journey that opened a PDF at a cited page left that file's last-read page
         // behind, and every later journey opening the same file resumed there instead of on page 1.
