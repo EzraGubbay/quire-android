@@ -52,7 +52,11 @@ class ChatStreamer
                 // Also thrown after a cancel-induced close; send on a closed channel is a no-op via trySend.
                 trySend(networkError(e))
             } finally {
-                body.close()
+                // Do NOT close the body here. awaitClose owns the single body.close() — on normal
+                // completion (after close() below) and on cancel (closing it there is what unblocks the
+                // blocking readUtf8Line above). Closing it from this reader coroutine too raced that close
+                // on another thread and left okio's process-global AsyncTimeout watchdog unbalanced
+                // ("Unbalanced enter/exit"), corrupting every later OkHttp call in the test process.
                 close()
             }
         }
