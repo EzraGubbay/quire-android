@@ -27,7 +27,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import retrofit2.Response
 import java.io.IOException
 
 private fun thread(
@@ -71,11 +70,11 @@ private class FakeThreadsApi : ChatApi {
 }
 
 private object NoStream : ChatStreamApi {
-    override suspend fun ask(
+    override fun ask(
         courseSlug: String,
         threadId: String,
         body: PostMessageRequest,
-    ): Response<ResponseBody> = error("not used")
+    ): retrofit2.Call<ResponseBody> = error("not used")
 }
 
 @RunWith(RobolectricTestRunner::class)
