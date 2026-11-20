@@ -96,7 +96,8 @@ therefore keys off the error event's **`kind`**, not its `code`: a "budget reach
 
 Reused from other epics within the journey (their own contracts own these): `course-card-{slug}`,
 `screen-course`, `tab-files`, `file-list`, `file-row-{fileId}` (E4); `screen-pdf-viewer`,
-`pdf-page-{n}` (E5) — a citation lands on `pdf-page-7`.
+`pdf-page-{n}` (E5) — a citation lands on `pdf-page-4` (the journey's `chat-stream-normal.ndjson` cites
+`pageNo: 4`, a page that exists in the 5-page `lecture-1.pdf` deck the viewer is served).
 
 ### Reconciliation with the #43 draft tag names
 
