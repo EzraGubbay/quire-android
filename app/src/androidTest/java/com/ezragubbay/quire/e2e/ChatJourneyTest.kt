@@ -447,6 +447,9 @@ class ChatJourneyTest {
         openSignalsCourse()
         composeRule.onNodeWithTag("tab-files").performClick()
         awaitTag("file-list")
+        // The file rows appear once the files response is stored, one step before the bundle's last fetch (notes)
+        // goes out. Let it go first, so the content request cannot be handed the notes response.
+        server.awaitRequest("/notes")
         composeRule.onNodeWithTag("file-row-$LECTURE_FILE_ID").performClick()
     }
 

@@ -56,9 +56,15 @@ class MockWebServerRule(
      * let a background fetch sequence finish asking before it triggers a request of its own; otherwise that
      * request can arrive first and be given a response queued for the sequence.
      */
-    fun awaitRequest(pathSuffix: String): RecordedRequest {
+    fun awaitRequest(
+        pathSuffix: String,
+        timeoutSeconds: Long = 5,
+    ): RecordedRequest {
         while (true) {
-            val request = takeRequest()
+            val request =
+                requireNotNull(server.takeRequest(timeoutSeconds, TimeUnit.SECONDS)) {
+                    "No request ending in $pathSuffix received"
+                }
             if (request.path?.endsWith(pathSuffix) == true) return request
         }
     }
