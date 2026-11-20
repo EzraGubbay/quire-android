@@ -17,7 +17,6 @@ import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -224,7 +223,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S4 (#47)
     @Test
-    @Ignore("QMOB-E6")
     fun answer_citationChip_opensViewerAtCitedPage() {
         openThreadReadyToSend()
         composeRule.onNodeWithTag("chat-input").performTextInput("What is convolution?")
@@ -242,7 +240,6 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S4 (#47)
     @Test
-    @Ignore("QMOB-E6")
     fun answer_sourcesRow_listsCitedSource() {
         openThreadReadyToSend()
         composeRule.onNodeWithTag("chat-input").performTextInput("What is convolution?")

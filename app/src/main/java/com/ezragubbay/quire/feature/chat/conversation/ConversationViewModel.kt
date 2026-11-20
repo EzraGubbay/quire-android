@@ -7,6 +7,7 @@ import com.ezragubbay.quire.core.data.chat.ChatRepository
 import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.core.network.ChatEvent
 import com.ezragubbay.quire.core.network.ChatMessageDto
+import com.ezragubbay.quire.core.network.CitationDto
 import com.ezragubbay.quire.core.network.ErrorCode
 import dagger.Binds
 import dagger.Module
@@ -33,6 +34,7 @@ data class Bubble(
     val role: Role,
     val text: String,
     val stopped: Boolean = false,
+    val citations: List<CitationDto> = emptyList(),
 )
 
 /**
@@ -237,7 +239,8 @@ class ConversationViewModel
                 is ChatEvent.Delta -> _state.update { it.copy(live = it.live.appendDelta(event.text)) }
                 is ChatEvent.Done ->
                     _state.update {
-                        it.copy(live = it.live.settle(event.message.content), streaming = false)
+                        val message = event.message
+                        it.copy(live = it.live.settle(message.content, message.citations), streaming = false)
                     }
                 is ChatEvent.Error -> _state.update { it.copy(streaming = false, error = event.toFailure()) }
             }
@@ -248,7 +251,8 @@ class ConversationViewModel
         }
     }
 
-private fun ChatMessageDto.toBubble() = Bubble(if (role == "user") Role.User else Role.Assistant, content)
+private fun ChatMessageDto.toBubble() =
+    Bubble(if (role == "user") Role.User else Role.Assistant, content, citations = citations)
 
 private fun List<Bubble>.appendDelta(text: String): List<Bubble> {
     val last = lastOrNull()
@@ -261,13 +265,16 @@ private fun List<Bubble>.appendDelta(text: String): List<Bubble> {
     }
 }
 
-private fun List<Bubble>.settle(text: String): List<Bubble> {
+private fun List<Bubble>.settle(
+    text: String,
+    citations: List<CitationDto>,
+): List<Bubble> {
     val last = lastOrNull()
     return if (last?.role ==
         Role.Assistant
     ) {
-        dropLast(1) + last.copy(text = text)
+        dropLast(1) + last.copy(text = text, citations = citations)
     } else {
-        this + Bubble(Role.Assistant, text)
+        this + Bubble(Role.Assistant, text, citations = citations)
     }
 }
