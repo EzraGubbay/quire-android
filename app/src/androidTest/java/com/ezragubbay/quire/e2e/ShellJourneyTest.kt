@@ -126,7 +126,11 @@ class ShellJourneyTest {
 
         pressSystemBack()
 
-        assertTrue("System back on the start destination must finish the activity", activity.isFinishing)
+        // The system asks the activity to finish just after the back press returns, so wait for it instead of
+        // sampling once.
+        composeRule.waitUntil("System back on the start destination must finish the activity", 5_000) {
+            activity.isFinishing
+        }
     }
 
     // un-ignored by QMOB-E2-S2 (#18)
