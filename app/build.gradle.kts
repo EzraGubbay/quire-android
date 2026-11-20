@@ -60,6 +60,11 @@ android {
 
     testOptions {
         animationsDisabled = true
+        // Run every instrumented test in its own process (AndroidTestOrchestrator). The e2e journeys share
+        // one app process otherwise, so a resource one test leaks (a coroutine, thread, native handle) can
+        // break later tests — e.g. a chat journey leaking state that stopped PDF pages rendering in the
+        // reader journeys that ran after it. A fresh process per test removes that cross-test coupling.
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.systemProperty("versionPropertiesPath", versionPropertiesFile.absolutePath)
@@ -162,6 +167,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestUtil(libs.androidx.test.orchestrator)
     // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.okhttp.mockwebserver)
