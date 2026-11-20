@@ -3,6 +3,7 @@ package com.ezragubbay.quire.e2e
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -250,7 +252,11 @@ class AuthJourneyTest {
         composeRule.waitUntil(PAIR_TIMEOUT_MS) {
             composeRule.onAllNodes(hasTestTag("action-pair") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("action-pair").performScrollTo().performClick()
+        // Invoke the button's click action rather than inject a tap at its position. The form is ime-padded and
+        // scrolls, and the soft keyboard may still be sliding in after the text edits: when it lands it shrinks
+        // the scroll viewport and can push the button back out of view, where a tap hits nothing and no pair
+        // request is ever sent.
+        composeRule.onNodeWithTag("action-pair").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         // Pairing is async (pair -> me -> store): wait for it to leave Pair or fail inline.
         composeRule.waitUntil(PAIR_TIMEOUT_MS) {
             composeRule.onAllNodesWithTag("screen-pair").fetchSemanticsNodes().isEmpty() ||
