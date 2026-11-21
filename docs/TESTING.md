@@ -45,6 +45,9 @@ listed in `docs/e2e/` (one file per epic, `E<n>.md`).
   `app/src/androidTest/assets/fixtures/name.json`; `baseUrl` is what the app under test should call; `takeRequest()`
   returns recorded requests.
 - Animations are disabled through `testOptions { animationsDisabled = true }`.
+- Every test runs in its own process under AndroidX Test Orchestrator with `clearPackageData`, so the app's storage
+  (Room, DataStore, WorkManager, cache and files dirs) is wiped after each test. A test must set up all the state it
+  needs and can never rely on what an earlier test left behind.
 - A debug-only network security config permits cleartext to `localhost`/`127.0.0.1` so the app can reach the mock server.
 - Contract-shaped fixtures for network unit tests live in `app/src/test/resources/contract/mobile-v1/` (vendored; never
   hand-edit).

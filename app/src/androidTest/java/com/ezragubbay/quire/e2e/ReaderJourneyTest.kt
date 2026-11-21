@@ -433,6 +433,9 @@ class ReaderJourneyTest {
         openSignalsCourse()
         composeRule.onNodeWithTag("tab-files").performClick()
         awaitTag("file-list")
+        // The file rows appear once the files response is stored, one step before the bundle's last fetch (notes)
+        // goes out. Let it go first, so a request the caller triggers next cannot be handed the notes response.
+        server.awaitRequest("/notes")
     }
 
     /** Opens the course's Files tab and taps the lecture deck row to drive the open-file flow. */

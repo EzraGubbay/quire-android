@@ -15,10 +15,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -68,6 +70,7 @@ fun CourseScreen(
     onBack: () -> Unit,
     onOpenFile: (fileId: String) -> Unit = {},
     onOpenNote: (noteId: String) -> Unit = {},
+    onAsk: () -> Unit = {},
     viewModel: CourseViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -80,6 +83,7 @@ fun CourseScreen(
         onRetry = viewModel::retry,
         onOpenFile = onOpenFile,
         onOpenNote = onOpenNote,
+        onAsk = onAsk,
     )
 }
 
@@ -94,12 +98,24 @@ internal fun CourseContent(
     onRetry: () -> Unit,
     onOpenFile: (String) -> Unit,
     onOpenNote: (String) -> Unit,
+    onAsk: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val content = state as? CourseUiState.Content
     Scaffold(
         modifier = Modifier.fillMaxSize().testTag("screen-course").nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = { QuireTopBar(title = content?.title.orEmpty(), onBack = onBack, scrollBehavior = scrollBehavior) },
+        topBar = {
+            QuireTopBar(
+                title = content?.title.orEmpty(),
+                onBack = onBack,
+                scrollBehavior = scrollBehavior,
+                actions = {
+                    IconButton(onClick = onAsk, modifier = Modifier.testTag("action-ask")) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.course_ask))
+                    }
+                },
+            )
+        },
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (state) {

@@ -19,9 +19,28 @@ data class NoteReaderRoute(
     val noteId: String,
 )
 
-/** The PDF viewer for [fileId] of course [courseSlug]; pushed over the shell (open-file flow, #38, targets it). */
+/** The PDF viewer for [fileId] of [courseSlug], optionally at 1-based [page]; pushed over the shell (#38). */
 @Serializable
 data class ViewerRoute(
     val courseSlug: String,
     val fileId: String,
+    val page: Int? = null,
+)
+
+/** One course's chat threads (the course screen's Ask destination); pushed over the shell. */
+@Serializable
+data class CourseThreadsRoute(
+    val slug: String,
+)
+
+/**
+ * The chat conversation for [threadId] of course [courseSlug]; pushed over the shell from a thread row, or after
+ * "New chat" created the thread (the thread is created first, then this route opens on its id). [documentTitle] is set
+ * when opened from the viewer's 'Ask about this document': the conversation then shows a header naming it.
+ */
+@Serializable
+data class ConversationRoute(
+    val courseSlug: String,
+    val threadId: String,
+    val documentTitle: String? = null,
 )

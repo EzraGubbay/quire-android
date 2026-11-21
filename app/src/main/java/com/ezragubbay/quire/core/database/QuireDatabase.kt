@@ -15,6 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
             NoteEntity::class,
             DownloadEntity::class,
             ReadingPositionEntity::class,
+            ThreadEntity::class,
         ],
     version = QuireDatabase.VERSION,
     exportSchema = true,
@@ -34,8 +35,10 @@ abstract class QuireDatabase : RoomDatabase() {
 
     abstract fun readingPositionDao(): ReadingPositionDao
 
+    abstract fun threadDao(): ThreadDao
+
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
         const val NAME = "quire.db"
     }
 }
@@ -65,5 +68,18 @@ val MIGRATION_2_3: Migration =
         }
     }
 
+/** 3 -> 4: adds the `threads` table (chat thread cache, E6-S2). */
+val MIGRATION_3_4: Migration =
+    object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `threads` (`id` TEXT NOT NULL, `courseSlug` TEXT NOT NULL, " +
+                    "`title` TEXT NOT NULL, `documentId` TEXT, `createdAt` TEXT NOT NULL, " +
+                    "`updatedAt` TEXT NOT NULL, PRIMARY KEY(`id`))",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_threads_courseSlug` ON `threads` (`courseSlug`)")
+        }
+    }
+
 /** Every migration between exported schema versions. */
-val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

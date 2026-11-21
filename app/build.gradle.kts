@@ -31,6 +31,12 @@ android {
         versionCode = loadVersion().code
         versionName = loadVersion().name
         testInstrumentationRunner = "com.ezragubbay.quire.testing.QuireTestRunner"
+        // Wipe the app's storage after every instrumented test, so no test sees what an earlier one stored. The Room
+        // database (reading positions, cached lists, downloads), DataStore, WorkManager and the cache/files dirs
+        // otherwise outlive a test: a journey that opened a PDF at a cited page left that file's last-read page
+        // behind, and every later journey opening the same file resumed there instead of on page 1.
+        // Needs the orchestrator (testOptions.execution) and the test-services APK (androidTestUtil).
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
     buildTypes {
@@ -60,6 +66,9 @@ android {
 
     testOptions {
         animationsDisabled = true
+        // One instrumentation process per test (AndroidX Test Orchestrator): required by clearPackageData above, and
+        // it also keeps process-wide state (WorkManager, statics, leaked coroutines) from crossing between tests.
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.systemProperty("versionPropertiesPath", versionPropertiesFile.absolutePath)
@@ -144,6 +153,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.retrofit.mock)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.work.testing)
     testImplementation(libs.turbine)
@@ -161,6 +171,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestUtil(libs.androidx.test.services)
     // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.okhttp.mockwebserver)

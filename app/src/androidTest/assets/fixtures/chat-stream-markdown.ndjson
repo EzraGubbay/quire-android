@@ -1,0 +1,4 @@
+{"type":"user","message":{"id":"d2e3f4a5-1b2c-4d3e-9f4a-5b6c7d8e9f0a","role":"user","content":"Explain convolution with the formula","citations":[],"error":null,"createdAt":"2026-11-03T10:02:00Z"}}
+{"type":"delta","text":"## Convolution\n\nConvolution is defined as:\n\n"}
+{"type":"delta","text":"$$ (f * g)(t) = \\int_{-\\infty}^{\\infty} f(\\tau)\\, g(t - \\tau)\\, d\\tau $$\n\n- It is commutative\n- See `conv()` [1]."}
+{"type":"done","message":{"id":"8b9c0d1e-2f3a-4b4c-9d5e-6f7a8b9c0d1e","role":"assistant","content":"## Convolution\n\nConvolution is defined as:\n\n$$ (f * g)(t) = \\int_{-\\infty}^{\\infty} f(\\tau)\\, g(t - \\tau)\\, d\\tau $$\n\n- It is commutative\n- See `conv()` [1].","citations":[{"n":1,"kind":"document","id":"6f1c2a52-8b0e-4c6a-9d63-2a3a7c1d9e10","title":"Lecture 3 - Convolution","pageNo":7}],"error":null,"createdAt":"2026-11-03T10:02:05Z"}}

@@ -29,6 +29,10 @@ import com.ezragubbay.quire.APP_ROOT_TAG
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.feature.chat.ChatsScreen
+import com.ezragubbay.quire.feature.chat.conversation.ConversationScreen
+import com.ezragubbay.quire.feature.chat.conversation.DocumentHeader
+import com.ezragubbay.quire.feature.chat.conversation.toViewerRoute
+import com.ezragubbay.quire.feature.chat.threads.CourseThreadsScreen
 import com.ezragubbay.quire.feature.courses.detail.CourseScreen
 import com.ezragubbay.quire.feature.courses.list.CoursesScreen
 import com.ezragubbay.quire.feature.downloads.DownloadsScreen
@@ -59,7 +63,9 @@ fun AppShell(
             destination?.hasRoute<CourseRoute>() == true ||
             destination?.hasRoute<SearchRoute>() == true ||
             destination?.hasRoute<ViewerRoute>() == true ||
-            destination?.hasRoute<NoteReaderRoute>() == true
+            destination?.hasRoute<NoteReaderRoute>() == true ||
+            destination?.hasRoute<CourseThreadsRoute>() == true ||
+            destination?.hasRoute<ConversationRoute>() == true
     val current = TopLevelDestination.entries.firstOrNull { destination?.hasRoute(it.route::class) == true }
 
     Scaffold(
@@ -118,10 +124,33 @@ fun AppShell(
                     onBack = { navController.popBackStack() },
                     onOpenFile = { navController.navigate(ViewerRoute(slug, it)) },
                     onOpenNote = { navController.navigate(NoteReaderRoute(slug, it)) },
+                    onAsk = { navController.navigate(CourseThreadsRoute(slug)) },
                 )
             }
-            composable<ViewerRoute> { PdfViewerScreen(onBack = { navController.popBackStack() }) }
+            composable<CourseThreadsRoute> {
+                CourseThreadsScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) },
+                )
+            }
+            composable<ViewerRoute> {
+                PdfViewerScreen(
+                    onBack = { navController.popBackStack() },
+                    onAskAboutDocument = { slug, thread, title ->
+                        navController.navigate(ConversationRoute(slug, thread, title))
+                    },
+                )
+            }
             composable<NoteReaderRoute> { NoteReaderScreen(onBack = { navController.popBackStack() }) }
+            composable<ConversationRoute> { entry ->
+                val route = entry.toRoute<ConversationRoute>()
+                val documentTitle = route.documentTitle
+                ConversationScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCitation = { c -> c.toViewerRoute(route.courseSlug)?.let { navController.navigate(it) } },
+                    documentHeader = documentTitle?.let { { DocumentHeader(it) } },
+                )
+            }
             composable<SearchRoute> {
                 SearchScreen(
                     onBack = { navController.popBackStack() },
@@ -129,7 +158,9 @@ fun AppShell(
                 )
             }
             composable<DownloadsRoute> { DownloadsScreen() }
-            composable<ChatsRoute> { ChatsScreen() }
+            composable<ChatsRoute> {
+                ChatsScreen(onOpenThread = { slug, id -> navController.navigate(ConversationRoute(slug, id)) })
+            }
             composable<SettingsRoute> {
                 SettingsScreen(
                     account = account,
