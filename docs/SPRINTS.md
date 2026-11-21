@@ -105,8 +105,8 @@ Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E
 
 ### v0.4.0 — Sprint 4 — AI Chat (v0.4.0)
 
-- [ ] `ChatJourneyTest` fully un-ignored and green.
-- [ ] On the phone: ask a question about a course and about an open document; answer streams; citation opens the page.
+- [x] `ChatJourneyTest` fully un-ignored and green. (65/65 e2e incl. 15 ChatJourneyTest — run 44743397434, `e4351e5`)
+- [ ] On the phone: ask a question about a course and about an open document; answer streams; citation opens the page. _(human on-device acceptance)_
 - [ ] Release PR `dev-rc` → `main` green: `build`, `lint`, `unit-tests`, `e2e`.
 
 | Story | Issue | Title | Size | Status |
