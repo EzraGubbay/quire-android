@@ -4,7 +4,10 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.ezragubbay.quire.core.data.settings.SettingsRepository
 import com.ezragubbay.quire.core.data.settings.UserSettings
 import com.ezragubbay.quire.core.designsystem.theme.ThemeMode
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -28,15 +31,26 @@ class SettingsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    // DataStore runs on the test scheduler (no real IO threads), so nothing can resume after resetMain().
+    private val storeScope = CoroutineScope(SupervisorJob() + dispatcher)
+    private val viewModels = mutableListOf<SettingsViewModel>()
+
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
 
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() {
+        // Cancel the ViewModels' collectors and the store before resetMain() so no coroutine outlives the test.
+        viewModels.forEach { it.viewModelScope.cancel() }
+        storeScope.cancel()
+        Dispatchers.resetMain()
+    }
+
+    private fun newVm(repo: SettingsRepository) = SettingsViewModel(repo).also { viewModels += it }
 
     private fun repo() =
         SettingsRepository(
-            PreferenceDataStoreFactory.create(scope = CoroutineScope(Dispatchers.IO)) {
+            PreferenceDataStoreFactory.create(scope = storeScope) {
                 tmp.newFile("s.preferences_pb").also { it.delete() }
             },
         )
@@ -44,7 +58,7 @@ class SettingsViewModelTest {
     @Test
     fun startsWithDefaults_thenReportsLoaded() =
         runTest(dispatcher) {
-            val vm = SettingsViewModel(repo())
+            val vm = newVm(repo())
             assertEquals(UserSettings(), vm.settings.value)
             assertFalse(vm.loaded.value)
             vm.loaded.first { it }
@@ -55,13 +69,13 @@ class SettingsViewModelTest {
     fun selectingTheme_updatesStateImmediatelyAndPersists() =
         runTest(dispatcher) {
             val repo = repo()
-            val vm = SettingsViewModel(repo)
+            val vm = newVm(repo)
             vm.loaded.first { it }
 
             vm.onThemeModeSelected(ThemeMode.Dark)
             assertEquals(ThemeMode.Dark, vm.settings.value.themeMode)
 
-            // DataStore writes on a real IO thread; wait for the persisted value to appear.
+            // Wait for the persisted value to appear.
             assertEquals(ThemeMode.Dark, repo.settings.first { it.themeMode == ThemeMode.Dark }.themeMode)
         }
 
@@ -69,7 +83,7 @@ class SettingsViewModelTest {
     fun togglingDeviceColors_updatesStateAndPersists() =
         runTest(dispatcher) {
             val repo = repo()
-            val vm = SettingsViewModel(repo)
+            val vm = newVm(repo)
             vm.loaded.first { it }
 
             vm.onUseDeviceColorsChanged(true)
