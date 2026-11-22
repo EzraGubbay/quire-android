@@ -84,7 +84,7 @@ class PairViewModel
             val current = _state.value
             if (!current.canPair) return
             val url = current.serverUrl.trim()
-            if (!ServerUrl.isAllowed(url, BuildConfig.DEBUG)) {
+            if (!ServerUrl.isAllowed(url, BuildConfig.ALLOW_CLEARTEXT_LOCAL)) {
                 _state.update { it.copy(error = PairError.InvalidUrl) }
                 return
             }

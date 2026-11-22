@@ -24,6 +24,8 @@ fun loadVersion() =
     )
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
+// `-PtestBuildType=minified` points instrumented tests at the R8-minified build (connectedMinifiedAndroidTest).
+val testBuildTypeName = providers.gradleProperty("testBuildType").orNull ?: "debug"
 val signing =
     SigningConfigResolver.resolve(
         System.getenv(),
@@ -51,7 +53,13 @@ android {
         // behind, and every later journey opening the same file resumed there instead of on page 1.
         // Needs the orchestrator (testOptions.execution) and the test-services APK (androidTestUtil).
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
+        // The minified build runs only the smoke subset (launch, pair, courses, open PDF, chat stream).
+        if (testBuildTypeName == "minified") {
+            testInstrumentationRunnerArguments["annotation"] = "com.ezragubbay.quire.testing.Smoke"
+        }
     }
+
+    testBuildType = testBuildTypeName
 
     signingConfigs {
         // Only defined when all four values resolve; otherwise preReleaseBuild fails fast (see below).
@@ -69,9 +77,27 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "ALLOW_CLEARTEXT_LOCAL", "true")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            // Cleartext (to loopback only) is a debug/test affordance; a shipped build is HTTPS-only.
+            buildConfigField("boolean", "ALLOW_CLEARTEXT_LOCAL", "false")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
+        }
+        // Release as shipped (R8 + resource shrinking), debug-signed, for the minified smoke run on an emulator.
+        // Differences from release: debug signing, and loopback cleartext so the hermetic MockWebServer journeys work.
+        create("minified") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            proguardFile("proguard-minified-rules.pro")
+            testProguardFiles("proguard-test-rules.pro")
+            buildConfigField("boolean", "ALLOW_CLEARTEXT_LOCAL", "true")
         }
     }
 
