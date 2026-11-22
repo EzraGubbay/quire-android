@@ -30,6 +30,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ezragubbay.quire.BuildConfig
@@ -50,8 +51,10 @@ fun SettingsScreen(
     onSignOut: () -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
+    syncViewModel: SyncSettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val sync by syncViewModel.state.collectAsStateWithLifecycle()
     SettingsContent(
         settings = settings,
         onBack = onBack,
@@ -59,6 +62,14 @@ fun SettingsScreen(
         onSignOut = onSignOut,
         onThemeModeSelected = viewModel::onThemeModeSelected,
         onUseDeviceColorsChanged = viewModel::onUseDeviceColorsChanged,
+        sync =
+            SyncActions(
+                state = sync,
+                onEnabledChanged = syncViewModel::onEnabledChanged,
+                onIntervalSelected = syncViewModel::onIntervalSelected,
+                onWifiOnlyChanged = syncViewModel::onWifiOnlyChanged,
+                onSyncNow = syncViewModel::onSyncNow,
+            ),
     )
 }
 
@@ -72,6 +83,7 @@ fun SettingsContent(
     modifier: Modifier = Modifier,
     account: SessionState.SignedIn? = null,
     onSignOut: () -> Unit = {},
+    sync: SyncActions? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showLicenses by rememberSaveable { mutableStateOf(false) }
@@ -133,6 +145,8 @@ fun SettingsContent(
             }
 
             if (account != null) AccountSection(account, onSignOut)
+
+            if (sync != null) SyncSection(sync)
 
             SectionHeader(stringResource(R.string.settings_about))
             ListItem(

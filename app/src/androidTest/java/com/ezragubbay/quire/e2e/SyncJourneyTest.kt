@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -21,6 +22,7 @@ import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.core.download.WorkManagerDownloadScheduler
+import com.ezragubbay.quire.sync.SyncWorkerFactory
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -73,8 +75,7 @@ import javax.inject.Inject
  *  - #52 (S2, offline pinning): the pin badge, the pinned auto-download-offline journey, the
  *    storage-cap warning.
  *
- * When #51 un-ignores the periodic-sync cases it must wire its sync worker factory into
- * [DelegatingWorkerFactory] (today it only delegates to the E5 [DownloadWorkerFactory]); see
+ * [DelegatingWorkerFactory] chains the E5 [DownloadWorkerFactory] and the E7 [SyncWorkerFactory]; see
  * [installTestWorkManager].
  */
 @HiltAndroidTest
@@ -98,6 +99,8 @@ class SyncJourneyTest {
 
     @Inject lateinit var downloadWorkerFactory: DownloadWorkerFactory
 
+    @Inject lateinit var syncWorkerFactory: SyncWorkerFactory
+
     private var scenario: ActivityScenario<MainActivity>? = null
 
     /** Each case starts with a test WorkManager, no scheduled work, and no persisted downloads. */
@@ -106,7 +109,7 @@ class SyncJourneyTest {
         hilt.inject()
         val context = ApplicationProvider.getApplicationContext<Context>()
         // Each case has a fresh Hilt graph (and Room instance); the delegating factory reads the current one.
-        currentWorkerFactory = downloadWorkerFactory
+        currentWorkerFactories = listOf(downloadWorkerFactory, syncWorkerFactory)
         // Test WorkManager: scheduled work waits for the driver instead of a real interval / network event.
         // WorkManager initialises once per process; later cases reuse it (the factory delegates to the current case's).
         runCatching {
@@ -135,9 +138,8 @@ class SyncJourneyTest {
         scenario?.close()
     }
 
-    // --- Sync settings controls: un-ignored by QMOB-E7-S1 (#51) ---------------------------------
+    // --- Sync settings controls: satisfied by QMOB-E7-S1 (#51) ---------------------------------
 
-    @Ignore("QMOB-E7")
     @Test
     fun syncSettings_exposesSyncControls() {
         enqueueCourses()
@@ -147,14 +149,12 @@ class SyncJourneyTest {
         // constraint, the last-success stamp and a manual 'Sync now'.
         composeRule.onNodeWithTag("action-settings").performClick()
         awaitTag("screen-settings")
-        composeRule.onNodeWithTag("setting-sync-enabled").assertIsDisplayed()
-        composeRule.onNodeWithTag("setting-sync-interval").assertIsDisplayed()
-        composeRule.onNodeWithTag("setting-sync-wifi-only").assertIsDisplayed()
-        composeRule.onNodeWithTag("sync-last-success").assertIsDisplayed()
-        composeRule.onNodeWithTag("action-sync-now").assertIsDisplayed()
+        // The Sync section sits below Appearance, so scroll each control into view first.
+        for (tag in SYNC_CONTROL_TAGS) {
+            composeRule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
+        }
     }
 
-    @Ignore("QMOB-E7")
     @Test
     fun syncNow_fromSettings_stampsLastSuccess() {
         enqueueCourses()
@@ -164,14 +164,13 @@ class SyncJourneyTest {
 
         // 'Sync now' forces an immediate metadata refetch; a successful one stamps the last-success time.
         enqueueCourses() // the forced refetch
-        composeRule.onNodeWithTag("action-sync-now").performClick()
+        composeRule.onNodeWithTag("action-sync-now").performScrollTo().performClick()
         awaitTag("sync-last-success")
-        composeRule.onNodeWithTag("sync-last-success").assertIsDisplayed()
+        composeRule.onNodeWithTag("sync-last-success").performScrollTo().assertIsDisplayed()
     }
 
-    // --- Periodic metadata sync: un-ignored by QMOB-E7-S1 (#51) ----------------------------------
+    // --- Periodic metadata sync: satisfied by QMOB-E7-S1 (#51) ----------------------------------
 
-    @Ignore("QMOB-E7")
     @Test
     fun periodicSync_surfacesNewServerFile_withoutManualRefresh() {
         enqueueCourses()
@@ -276,15 +275,20 @@ class SyncJourneyTest {
 
     /**
      * Enqueues the responses the periodic sync worker refetches, with the files list now carrying the
-     * extra 'Lecture 2' file. The worker's exact fetch order (whole list vs. open course only) is a
-     * QMOB-E7-S1 detail; this mirrors the course-detail order and is aligned there when un-ignored.
+     * extra 'Lecture 2' file. The worker refetches the whole list (`GET /courses`), then each course in list
+     * display order (detail, sessions, files, notes); only 'Signals and Systems' has fixtures.
      */
     private fun enqueueSyncBundle() {
         server.enqueueFixture("courses-list.json")
+        // The worker walks the cached courses in list display order (newest semester, then name): the Spring
+        // course first, then Signals and Systems, then the Hebrew one. Only Signals has fixtures; the others 404
+        // (one response each: a failed detail stops that course) so the worker finishes, not waits on the queue.
+        server.enqueueFixture("error-not-found.json", code = 404)
         server.enqueueFixture("course-detail.json")
         server.enqueueFixture("course-sessions.json")
         server.enqueueFixture("course-files-synced.json")
         server.enqueueFixture("course-notes.json")
+        server.enqueueFixture("error-not-found.json", code = 404)
     }
 
     /** Enqueues the 5-page PDF deck as a full `200` content body (Range/ETag per the contract). */
@@ -322,8 +326,11 @@ class SyncJourneyTest {
                 .getInstance(context)
                 .getWorkInfosForUniqueWork(SYNC_UNIQUE_WORK)
                 .get()
-                .first()
-        requireNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setPeriodDelayMet(info.id)
+                .first { !it.state.isFinished }
+        val driver = requireNotNull(WorkManagerTestInitHelper.getTestDriver(context))
+        // The periodic work is constrained (network, battery not low): meet those, then release its period.
+        driver.setAllConstraintsMet(info.id)
+        driver.setPeriodDelayMet(info.id)
         composeRule.waitForIdle()
     }
 
@@ -351,20 +358,32 @@ class SyncJourneyTest {
     }
 
     /**
-     * WorkManager instantiates workers through this. It delegates to the current case's
-     * [DownloadWorkerFactory] (E5). QMOB-E7-S1 chains its sync worker factory here when it un-ignores
-     * the periodic-sync cases; a factory returning `null` falls through to WorkManager's default.
+     * WorkManager instantiates workers through this. It chains the current case's factories (the E5
+     * [DownloadWorkerFactory] and the E7 [SyncWorkerFactory]): the first one that recognises the worker class
+     * builds it; a factory returning `null` falls through to the next, then to WorkManager's default.
      */
     private object DelegatingWorkerFactory : WorkerFactory() {
         override fun createWorker(
             appContext: Context,
             workerClassName: String,
             workerParameters: WorkerParameters,
-        ): ListenableWorker? = currentWorkerFactory?.createWorker(appContext, workerClassName, workerParameters)
+        ): ListenableWorker? =
+            currentWorkerFactories.firstNotNullOfOrNull {
+                it.createWorker(appContext, workerClassName, workerParameters)
+            }
     }
 
     private companion object {
-        @Volatile var currentWorkerFactory: DownloadWorkerFactory? = null
+        @Volatile var currentWorkerFactories: List<WorkerFactory> = emptyList()
+
+        val SYNC_CONTROL_TAGS =
+            listOf(
+                "setting-sync-enabled",
+                "setting-sync-interval",
+                "setting-sync-wifi-only",
+                "sync-last-success",
+                "action-sync-now",
+            )
 
         const val TIMEOUT_MS = 10_000L
         const val DECK_PDF = "lecture-1.pdf"
