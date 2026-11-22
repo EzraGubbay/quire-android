@@ -57,7 +57,8 @@ class SyncWorkerTest {
 
     @Before
     fun setUp() {
-        store = SyncSettingsStore(PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("sync.preferences_pb") })
+        store =
+            SyncSettingsStore(PreferenceDataStoreFactory.create(scope = scope) { tmp.newFile("sync.preferences_pb") })
     }
 
     @After
