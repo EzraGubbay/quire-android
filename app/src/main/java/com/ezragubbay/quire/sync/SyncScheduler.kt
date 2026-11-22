@@ -38,11 +38,21 @@ object SyncPolicy {
 class WorkManagerSyncScheduler(
     private val context: Context,
 ) : SyncScheduler {
-    private val work get() = WorkManager.getInstance(context)
+    /**
+     * Null when WorkManager is not initialised (instrumented journeys that run under the Hilt test application and
+     * do not install a test WorkManager): scheduling is then a no-op instead of crashing the launch activity.
+     */
+    private val work: WorkManager?
+        get() =
+            try {
+                WorkManager.getInstance(context)
+            } catch (_: IllegalStateException) {
+                null
+            }
 
     override fun apply(settings: SyncSettings) {
         if (!settings.periodic) {
-            work.cancelUniqueWork(SyncScheduler.PERIODIC_NAME)
+            work?.cancelUniqueWork(SyncScheduler.PERIODIC_NAME)
             return
         }
         val request =
@@ -51,7 +61,7 @@ class WorkManagerSyncScheduler(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
                 .build()
         // UPDATE: a changed interval/constraint is applied in place (same work id, next run time kept); same = no-op.
-        work.enqueueUniquePeriodicWork(SyncScheduler.PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+        work?.enqueueUniquePeriodicWork(SyncScheduler.PERIODIC_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     override fun syncSoon(wifiOnly: Boolean) {
@@ -60,7 +70,7 @@ class WorkManagerSyncScheduler(
                 .setConstraints(constraints(wifiOnly, batteryNotLow = false))
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
                 .build()
-        work.enqueueUniqueWork(SyncScheduler.STARTUP_NAME, ExistingWorkPolicy.KEEP, request)
+        work?.enqueueUniqueWork(SyncScheduler.STARTUP_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
     private fun constraints(
