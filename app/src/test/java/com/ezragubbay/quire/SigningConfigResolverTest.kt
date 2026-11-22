@@ -16,7 +16,8 @@ class SigningConfigResolverTest {
             "QUIRE_KEY_PASSWORD" to "keypw",
         )
 
-    private fun props(vararg pairs: Pair<String, String>) = Properties().apply { pairs.forEach { setProperty(it.first, it.second) } }
+    private fun props(vararg pairs: Pair<String, String>) =
+        Properties().apply { pairs.forEach { setProperty(it.first, it.second) } }
 
     @Test
     fun allFourFromEnvResolve() {

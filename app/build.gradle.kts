@@ -1,3 +1,6 @@
+import com.ezragubbay.quire.buildlogic.SigningConfigResolver
+import com.ezragubbay.quire.buildlogic.SigningResolution
+import com.ezragubbay.quire.buildlogic.TrackedSecretsCheck
 import com.ezragubbay.quire.buildlogic.VersionParser
 import java.util.Properties
 
@@ -20,6 +23,17 @@ fun loadVersion() =
         Properties().apply { versionPropertiesFile.reader().use(::load) },
     )
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val signing =
+    SigningConfigResolver.resolve(
+        System.getenv(),
+        if (keystorePropertiesFile.isFile) {
+            Properties().apply { keystorePropertiesFile.reader().use(::load) }
+        } else {
+            null
+        },
+    )
+
 android {
     namespace = "com.ezragubbay.quire"
     compileSdk = 36
@@ -39,9 +53,25 @@ android {
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
+    signingConfigs {
+        // Only defined when all four values resolve; otherwise preReleaseBuild fails fast (see below).
+        if (signing is SigningResolution.Resolved) {
+            create("release") {
+                storeFile = file(signing.storeFile)
+                storePassword = signing.storePassword
+                keyAlias = signing.keyAlias
+                keyPassword = signing.keyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
@@ -107,6 +137,29 @@ tasks.register("verifyVersion") {
     val file = versionPropertiesFile
     inputs.file(file)
     doLast { println("version.properties OK: ${loadVersion()}") }
+}
+
+// Fails assembleRelease/bundleRelease up front when signing is not configured; debug builds and checks never hit it.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        (signing as? SigningResolution.Missing)?.let {
+            throw GradleException(
+                SigningConfigResolver.failureMessage(it.keys),
+            )
+        }
+    }
+}
+
+tasks.register("verifyNoTrackedSecrets") {
+    val root = rootProject.projectDir
+    doLast {
+        val proc = ProcessBuilder("git", "ls-files").directory(root).redirectErrorStream(true).start()
+        val tracked = proc.inputStream.bufferedReader().readLines()
+        check(proc.waitFor() == 0) { "git ls-files failed: ${tracked.joinToString(" ")}" }
+        val violations = TrackedSecretsCheck.findViolations(tracked)
+        if (violations.isNotEmpty()) throw GradleException(TrackedSecretsCheck.failureMessage(violations))
+        println("verifyNoTrackedSecrets OK")
+    }
 }
 
 roborazzi {
