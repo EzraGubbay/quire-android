@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
+import com.ezragubbay.quire.testing.Smoke
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import okhttp3.mockwebserver.RecordedRequest
@@ -91,6 +92,7 @@ class CoursesJourneyTest {
 
     // un-ignored by QMOB-E4-S2 (#31)
     @Test
+    @Smoke("courses")
     fun signedInLaunch_showsSemesterGroupedCourseList() {
         enqueueCourses()
         launch()

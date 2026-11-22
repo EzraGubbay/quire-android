@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
+import com.ezragubbay.quire.testing.Smoke
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.After
@@ -167,6 +168,7 @@ class ChatJourneyTest {
 
     // un-ignored by QMOB-E6-S3 (#46)
     @Test
+    @Smoke("chat-stream")
     fun conversation_send_showsUserBubble_thenStreamsAnswerIncrementally() {
         openThreadReadyToSend()
 

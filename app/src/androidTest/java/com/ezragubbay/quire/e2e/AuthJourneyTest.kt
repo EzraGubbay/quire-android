@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
+import com.ezragubbay.quire.testing.Smoke
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import okhttp3.mockwebserver.MockResponse
@@ -83,6 +84,7 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
+    @Smoke("launch")
     fun freshInstall_showsPairScreen_notTabShell() {
         launch()
 
@@ -97,6 +99,7 @@ class AuthJourneyTest {
 
     // un-ignored by QMOB-E3-S3 (#26)
     @Test
+    @Smoke("pair")
     fun enterServerUrlAndCode_pairs_landsOnCourses() {
         // POST /auth/pair → 200 mints a token (shape mirrors pairDevice.200.json), then GET /me validates it.
         server.enqueueFixture("pair-success.json")
