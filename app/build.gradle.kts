@@ -230,6 +230,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.room.testing)
+    // WorkManager test driver (WorkManagerTestInitHelper / TestDriver) for the E7 sync journey.
+    androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
