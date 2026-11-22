@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,7 +37,16 @@ import com.ezragubbay.quire.core.designsystem.component.SectionHeader
 @Composable
 fun DownloadsScreen(viewModel: DownloadsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    DownloadsContent(state, viewModel::remove, viewModel::retry, viewModel::removeAll)
+    val pinning by viewModel.pinning.collectAsStateWithLifecycle()
+    DownloadsContent(
+        state,
+        viewModel::remove,
+        viewModel::retry,
+        viewModel::removeAll,
+        pinning,
+        viewModel::pin,
+        viewModel::unpin,
+    )
 }
 
 @Composable
@@ -44,18 +55,36 @@ internal fun DownloadsContent(
     onRemove: (String) -> Unit,
     onRetry: (String) -> Unit,
     onRemoveAll: () -> Unit,
+    pinning: PinUiState = PinUiState(),
+    onPin: (String) -> Unit = {},
+    onUnpin: (slug: String, removeFiles: Boolean) -> Unit = { _, _ -> },
 ) {
-    Box(Modifier.fillMaxSize().testTag("screen-downloads")) {
-        when (state) {
-            DownloadsUiState.Loading -> LoadingSkeleton()
-            DownloadsUiState.Empty ->
-                Box(Modifier.fillMaxSize().testTag("downloads-empty")) {
-                    EmptyState(
-                        title = stringResource(R.string.downloads_empty_title),
-                        message = stringResource(R.string.downloads_empty_message),
-                    )
-                }
-            is DownloadsUiState.Content -> DownloadsList(state, onRemove, onRetry, onRemoveAll)
+    Column(Modifier.fillMaxSize().testTag("screen-downloads")) {
+        if (pinning.capWarning) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth().testTag("storage-cap-warning"),
+            ) {
+                Text(
+                    stringResource(R.string.pin_cap_warning),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        }
+        Box(Modifier.fillMaxSize()) {
+            when (state) {
+                DownloadsUiState.Loading -> LoadingSkeleton()
+                DownloadsUiState.Empty ->
+                    Box(Modifier.fillMaxSize().testTag("downloads-empty")) {
+                        EmptyState(
+                            title = stringResource(R.string.downloads_empty_title),
+                            message = stringResource(R.string.downloads_empty_message),
+                        )
+                    }
+                is DownloadsUiState.Content -> DownloadsList(state, onRemove, onRetry, onRemoveAll, onPin, onUnpin)
+            }
         }
     }
 }
@@ -66,8 +95,11 @@ private fun DownloadsList(
     onRemove: (String) -> Unit,
     onRetry: (String) -> Unit,
     onRemoveAll: () -> Unit,
+    onPin: (String) -> Unit,
+    onUnpin: (slug: String, removeFiles: Boolean) -> Unit,
 ) {
     var confirmRemoveAll by rememberSaveable { mutableStateOf(false) }
+    var unpinning by rememberSaveable { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -87,7 +119,15 @@ private fun DownloadsList(
             state.groups.forEach { group ->
                 item(key = "group-${group.courseId}") {
                     Column(Modifier.testTag("download-group-${group.courseId}")) {
-                        SectionHeader(group.courseName)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { SectionHeader(group.courseName) }
+                            FilterChip(
+                                selected = group.pinned,
+                                onClick = { if (group.pinned) unpinning = group.courseId else onPin(group.courseId) },
+                                label = { Text(stringResource(R.string.pin_available_offline)) },
+                                modifier = Modifier.padding(end = 16.dp).testTag("download-pin-${group.courseId}"),
+                            )
+                        }
                     }
                 }
                 items(group.rows, key = { it.fileId }) { row ->
@@ -95,6 +135,15 @@ private fun DownloadsList(
                 }
             }
         }
+    }
+    unpinning?.let { slug ->
+        UnpinDialog(
+            onUnpin = {
+                unpinning = null
+                onUnpin(slug, it)
+            },
+            onDismiss = { unpinning = null },
+        )
     }
     if (confirmRemoveAll) {
         AlertDialog(

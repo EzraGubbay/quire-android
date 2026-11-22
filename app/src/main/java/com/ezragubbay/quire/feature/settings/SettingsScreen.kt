@@ -69,6 +69,7 @@ fun SettingsScreen(
                 onIntervalSelected = syncViewModel::onIntervalSelected,
                 onWifiOnlyChanged = syncViewModel::onWifiOnlyChanged,
                 onSyncNow = syncViewModel::onSyncNow,
+                offline = OfflineActions(syncViewModel::onNotifyChanged, syncViewModel::onCapSelected),
             ),
     )
 }

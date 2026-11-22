@@ -4,6 +4,7 @@ import com.ezragubbay.quire.core.data.course.CourseRepository
 import com.ezragubbay.quire.core.data.course.SyncState
 import com.ezragubbay.quire.core.database.CourseDao
 import com.ezragubbay.quire.core.network.ApiResult
+import kotlinx.coroutines.CancellationException
 
 /** The repository operations a metadata sync needs; a seam so the worker is testable with fakes. */
 interface CourseSyncSource {
@@ -54,6 +55,7 @@ class SyncRunner(
     private val store: SyncSettingsStore,
     private val isSignedIn: suspend () -> Boolean,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val pinned: PinnedSync = PinnedSync.None,
 ) {
     suspend fun run(): SyncOutcome =
         if (isSignedIn()) {
@@ -65,13 +67,30 @@ class SyncRunner(
     private suspend fun syncCourses(): SyncOutcome {
         var failed = 0
         for (slug in source.courseSlugs()) {
-            when (val outcome = classify(source.refreshCourse(slug))) {
+            val before = pinned.snapshot(slug)
+            val state = source.refreshCourse(slug)
+            if (before != null && state == SyncState.Synced) autoDownload(slug, before)
+            when (val outcome = classify(state)) {
                 null -> Unit
                 SyncOutcome.Unauthorized -> return outcome
                 else -> failed++
             }
         }
         return if (failed > 0) SyncOutcome.Partial(failed) else SyncOutcome.Success
+    }
+
+    /** Pinned course just refreshed: queue what is new or changed, drop what the server removed. Never fails a sync. */
+    private suspend fun autoDownload(
+        slug: String,
+        before: List<PinFile>,
+    ) {
+        try {
+            pinned.afterRefresh(slug, before)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Best effort: the next sync diffs again (undownloaded files count as missing).
+        }
     }
 
     private suspend fun stamp() = store.recordSuccess(clock())

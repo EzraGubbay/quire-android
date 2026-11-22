@@ -1,6 +1,10 @@
 package com.ezragubbay.quire.feature.settings
 
+import android.Manifest
+import android.os.Build
 import android.text.format.DateUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.selection.selectable
@@ -31,6 +35,10 @@ import com.ezragubbay.quire.sync.SyncInterval
 internal fun SyncSection(sync: SyncActions) {
     val settings = sync.state.settings
     var picking by rememberSaveable { mutableStateOf(false) }
+    var pickingCap by rememberSaveable { mutableStateOf(false) }
+    val offline = sync.state.offline
+    // Turning the summary notification on asks for the notification permission (Android 13+); denial keeps it silent.
+    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     Column {
         SectionHeader(stringResource(R.string.settings_sync))
         ListItem(
@@ -73,6 +81,60 @@ internal fun SyncSection(sync: SyncActions) {
                     .testTag("action-sync-now")
                     .clickable(enabled = !sync.state.syncing, role = Role.Button, onClick = sync.onSyncNow),
         )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_storage_cap)) },
+            supportingContent = { Text(capLabel(offline.capBytes)) },
+            modifier = Modifier.testTag("setting-storage-cap").clickable(role = Role.Button) { pickingCap = true },
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_pin_notify)) },
+            supportingContent = { Text(stringResource(R.string.settings_pin_notify_summary)) },
+            trailingContent = { Switch(checked = offline.notify, onCheckedChange = null) },
+            modifier =
+                Modifier
+                    .testTag("setting-pin-notify")
+                    .toggleable(
+                        value = offline.notify,
+                        role = Role.Switch,
+                        onValueChange = {
+                            sync.offline.onNotifyChanged(it)
+                            if (it && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        },
+                    ),
+        )
+    }
+    if (pickingCap) {
+        AlertDialog(
+            onDismissRequest = { pickingCap = false },
+            title = { Text(stringResource(R.string.settings_storage_cap)) },
+            text = {
+                Column(modifier = Modifier.selectableGroup()) {
+                    CAP_OPTIONS_GB.forEach { gb ->
+                        val bytes = gb * BYTES_PER_GB
+                        ListItem(
+                            headlineContent = { Text(capLabel(bytes)) },
+                            leadingContent = { RadioButton(selected = bytes == offline.capBytes, onClick = null) },
+                            modifier =
+                                Modifier
+                                    .testTag("storage-cap-$gb")
+                                    .selectable(
+                                        selected = bytes == offline.capBytes,
+                                        role = Role.RadioButton,
+                                        onClick = {
+                                            sync.offline.onCapSelected(bytes)
+                                            pickingCap = false
+                                        },
+                                    ),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pickingCap = false }) { Text(stringResource(R.string.action_close)) }
+            },
+        )
     }
     if (picking) {
         AlertDialog(
@@ -107,6 +169,12 @@ internal fun SyncSection(sync: SyncActions) {
         )
     }
 }
+
+private val CAP_OPTIONS_GB = listOf(1L, 2L, 5L, 10L)
+private const val BYTES_PER_GB = 1024L * 1024 * 1024
+
+@Composable
+private fun capLabel(bytes: Long): String = stringResource(R.string.settings_storage_cap_gb, bytes / BYTES_PER_GB)
 
 @Composable
 private fun intervalLabel(interval: SyncInterval): String =
