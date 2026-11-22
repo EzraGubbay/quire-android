@@ -45,3 +45,12 @@ The release workflow decodes `QUIRE_KEYSTORE_BASE64` to a temp file and exports 
 ### Local signed build (optional)
 
 Create `keystore.properties` (git-ignored) with the four `QUIRE_*` keys above, then run `./gradlew assembleRelease`.
+
+## Verify a published release (Obtainium)
+
+`scripts/check-release.sh <tag>` (needs `gh`, `apkanalyzer`, `apksigner` on PATH) asserts against the published GitHub
+release: exactly one `.apk` asset, `applicationId` `com.ezragubbay.quire`, `versionName` equal to the tag without `v`,
+the same signing certificate as every earlier release (optionally pin it with `EXPECTED_CERT_SHA256`), and a
+`versionCode` strictly greater than all earlier releases. The pure rules live in
+`buildSrc/.../buildlogic/ReleaseChecks.kt` and are unit-tested by `ReleaseChecksTest` in the `unit-tests` CI job.
+Run it after each release, e.g. `scripts/check-release.sh v1.0.0-rc1`.

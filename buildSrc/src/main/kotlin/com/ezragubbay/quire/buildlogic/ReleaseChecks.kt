@@ -16,7 +16,8 @@ object ReleaseChecks {
     ): String? {
         if (!tag.startsWith("v")) return "Tag must start with 'v', was: $tag"
         val expected = tag.removePrefix("v")
-        return if (versionName == expected) null else "versionName '$versionName' must equal tag without 'v' ('$expected')"
+        if (versionName == expected) return null
+        return "versionName '$versionName' must equal '$expected' (tag without 'v')"
     }
 
     fun versionCodeIncreases(
