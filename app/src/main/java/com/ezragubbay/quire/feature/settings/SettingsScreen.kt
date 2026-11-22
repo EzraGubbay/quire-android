@@ -144,9 +144,9 @@ fun SettingsContent(
                 )
             }
 
-            if (sync != null) SyncSection(sync)
-
             if (account != null) AccountSection(account, onSignOut)
+
+            if (sync != null) SyncSection(sync)
 
             SectionHeader(stringResource(R.string.settings_about))
             ListItem(

@@ -276,17 +276,19 @@ class SyncJourneyTest {
     /**
      * Enqueues the responses the periodic sync worker refetches, with the files list now carrying the
      * extra 'Lecture 2' file. The worker refetches the whole list (`GET /courses`), then each course in list
-     * order (detail, sessions, files, notes); 'Signals and Systems' is first, the other two courses 404.
+     * display order (detail, sessions, files, notes); only 'Signals and Systems' has fixtures.
      */
     private fun enqueueSyncBundle() {
         server.enqueueFixture("courses-list.json")
+        // The worker walks the cached courses in list display order (newest semester, then name): the Spring
+        // course first, then Signals and Systems, then the Hebrew one. Only Signals has fixtures; the others 404
+        // (one response each: a failed detail stops that course) so the worker finishes, not waits on the queue.
+        server.enqueueFixture("error-not-found.json", code = 404)
         server.enqueueFixture("course-detail.json")
         server.enqueueFixture("course-sessions.json")
         server.enqueueFixture("course-files-synced.json")
         server.enqueueFixture("course-notes.json")
-        // The other two courses in the list have no fixtures: answer them 404 so the worker finishes
-        // instead of waiting on an empty queue.
-        repeat(UNFIXTURED_COURSES) { server.enqueueFixture("error-not-found.json", code = 404) }
+        server.enqueueFixture("error-not-found.json", code = 404)
     }
 
     /** Enqueues the 5-page PDF deck as a full `200` content body (Range/ETag per the contract). */
@@ -382,9 +384,6 @@ class SyncJourneyTest {
                 "sync-last-success",
                 "action-sync-now",
             )
-
-        /** Courses in `courses-list.json` beyond the first, which `course-detail.json` etc. describe. */
-        const val UNFIXTURED_COURSES = 2
 
         const val TIMEOUT_MS = 10_000L
         const val DECK_PDF = "lecture-1.pdf"
