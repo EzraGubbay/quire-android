@@ -323,7 +323,10 @@ class SyncJourneyTest {
         awaitTag("screen-course")
     }
 
-    /** Switches the open course to its Files tab and waits for the list. */
+    /**
+     * Switches the open course to its Files tab and waits for the list, then for the course bundle's notes
+     * request. Call it once, after the course was opened with [enqueueCourseDetail] queued.
+     */
     private fun selectFilesTab() {
         composeRule.onNodeWithTag("tab-files").performClick()
         awaitTag("file-list")
@@ -362,7 +365,8 @@ class SyncJourneyTest {
                 .getInstance(context)
                 .getWorkInfosForUniqueWork(WorkManagerDownloadScheduler.uniqueName(fileId))
                 .get()
-                .first()
+                .firstOrNull()
+        checkNotNull(info) { "No download work was enqueued for $fileId" }
         requireNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setAllConstraintsMet(info.id)
         composeRule.waitForIdle()
     }
