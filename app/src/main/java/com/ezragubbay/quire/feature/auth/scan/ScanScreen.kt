@@ -136,7 +136,7 @@ private fun CameraPreview(
                     it.setAnalyzer(
                         executor,
                         QrAnalyzer { text ->
-                            when (val result = PairUriParser.parse(text, BuildConfig.DEBUG)) {
+                            when (val result = PairUriParser.parse(text, BuildConfig.ALLOW_CLEARTEXT_LOCAL)) {
                                 is PairUriResult.Valid ->
                                     if (!done) {
                                         done = true

@@ -145,7 +145,7 @@ private fun PairDestination(
     val (server, code) = entry.toRoute<PairRoute>()
     LaunchedEffect(entry, server, code) {
         if (server != null || code != null) {
-            val parsed = PairUriParser.validate(server, code, BuildConfig.DEBUG)
+            val parsed = PairUriParser.validate(server, code, BuildConfig.ALLOW_CLEARTEXT_LOCAL)
             if (parsed is PairUriResult.Valid) pairViewModel.prefill(parsed.serverUrl, parsed.code)
         }
     }

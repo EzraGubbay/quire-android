@@ -44,7 +44,11 @@ object NetworkModule {
             config = config,
             tokens = tokens,
             events = events,
-            options = NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+            options =
+                NetworkOptions(
+                    allowCleartextLocal = BuildConfig.ALLOW_CLEARTEXT_LOCAL,
+                    debugLogging = BuildConfig.DEBUG,
+                ),
         )
 
     @Provides
@@ -58,7 +62,11 @@ object NetworkModule {
             config = config,
             tokens = tokens,
             events = events,
-            options = NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+            options =
+                NetworkOptions(
+                    allowCleartextLocal = BuildConfig.ALLOW_CLEARTEXT_LOCAL,
+                    debugLogging = BuildConfig.DEBUG,
+                ),
         )
 
     @Provides
@@ -73,7 +81,10 @@ object NetworkModule {
                 config,
                 tokens,
                 events,
-                NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+                NetworkOptions(
+                    allowCleartextLocal = BuildConfig.ALLOW_CLEARTEXT_LOCAL,
+                    debugLogging = BuildConfig.DEBUG,
+                ),
             ),
         )
 
@@ -88,6 +99,10 @@ object NetworkModule {
             config = config,
             tokens = tokens,
             events = events,
-            options = NetworkOptions(allowCleartextLocal = BuildConfig.DEBUG, debugLogging = BuildConfig.DEBUG),
+            options =
+                NetworkOptions(
+                    allowCleartextLocal = BuildConfig.ALLOW_CLEARTEXT_LOCAL,
+                    debugLogging = BuildConfig.DEBUG,
+                ),
         )
 }
