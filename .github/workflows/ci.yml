@@ -116,6 +116,18 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
       - uses: gradle/actions/setup-gradle@v4
+      # Robolectric fetches its android-all runtime jar from Maven Central into ~/.m2 at test time; a flaky
+      # fetch fails every Robolectric class (#143). Cache it so re-runs and later PRs skip the network fetch.
+      - name: Robolectric version
+        id: robolectric
+        run: echo "version=$(sed -n 's/^robolectric = "\(.*\)"/\1/p' gradle/libs.versions.toml)" >> "$GITHUB_OUTPUT"
+      - name: Cache Robolectric android-all runtime jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-android-all-${{ steps.robolectric.outputs.version }}-${{ hashFiles('app/src/test/resources/robolectric.properties') }}
+          restore-keys: |
+            robolectric-android-all-${{ steps.robolectric.outputs.version }}-
       - name: JVM unit tests (JUnit, Robolectric, Roborazzi verify)
         run: ./gradlew testDebugUnitTest --stacktrace
       - uses: actions/upload-artifact@v4
