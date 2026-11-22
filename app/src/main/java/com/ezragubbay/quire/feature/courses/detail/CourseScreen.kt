@@ -16,9 +16,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +35,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -52,6 +57,7 @@ import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
 import com.ezragubbay.quire.feature.courses.files.FileSort
 import com.ezragubbay.quire.feature.courses.files.FilesTab
+import com.ezragubbay.quire.feature.downloads.UnpinDialog
 import kotlinx.coroutines.launch
 
 private val TABS =
@@ -84,6 +90,8 @@ fun CourseScreen(
         onOpenFile = onOpenFile,
         onOpenNote = onOpenNote,
         onAsk = onAsk,
+        onPin = viewModel::pin,
+        onUnpin = viewModel::unpin,
     )
 }
 
@@ -99,6 +107,8 @@ internal fun CourseContent(
     onOpenFile: (String) -> Unit,
     onOpenNote: (String) -> Unit,
     onAsk: () -> Unit = {},
+    onPin: () -> Unit = {},
+    onUnpin: (removeFiles: Boolean) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val content = state as? CourseUiState.Content
@@ -136,6 +146,8 @@ internal fun CourseContent(
                         onSelectFileSort,
                         onOpenFile,
                         onOpenNote,
+                        onPin,
+                        onUnpin,
                     )
             }
         }
@@ -151,6 +163,8 @@ private fun CourseTabs(
     onSelectFileSort: (FileSort) -> Unit,
     onOpenFile: (String) -> Unit,
     onOpenNote: (String) -> Unit,
+    onPin: () -> Unit,
+    onUnpin: (removeFiles: Boolean) -> Unit,
 ) {
     // rememberPagerState is saveable, so the selected tab survives rotation and process death.
     val pager = rememberPagerState { TABS.size }
@@ -168,6 +182,8 @@ private fun CourseTabs(
                         .testTag("course-subtitle"),
             )
         }
+        PinRow(state.pinned, onPin, onUnpin)
+        if (state.capWarning) CapWarning()
         PrimaryTabRow(selectedTabIndex = pager.currentPage, modifier = Modifier.testTag("course-tabs")) {
             TABS.forEach { (tag, label, index) ->
                 Tab(
@@ -321,6 +337,60 @@ private fun NotesTab(
                 )
             }
         }
+    }
+}
+
+/** 'Available offline' toggle plus the pinned badge. Unpinning asks whether to keep the downloaded files. */
+@Composable
+private fun PinRow(
+    pinned: Boolean,
+    onPin: () -> Unit,
+    onUnpin: (removeFiles: Boolean) -> Unit,
+) {
+    var confirmUnpin by rememberSaveable { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = QuireTheme.spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(QuireTheme.spacing.sm),
+    ) {
+        FilterChip(
+            selected = pinned,
+            onClick = { if (pinned) confirmUnpin = true else onPin() },
+            label = { Text(stringResource(R.string.pin_available_offline)) },
+            modifier = Modifier.testTag("action-pin-course"),
+        )
+        if (pinned) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = stringResource(R.string.pin_badge_description),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("pinned-badge"),
+            )
+        }
+    }
+    if (confirmUnpin) {
+        UnpinDialog(
+            onUnpin = {
+                confirmUnpin = false
+                onUnpin(it)
+            },
+            onDismiss = { confirmUnpin = false },
+        )
+    }
+}
+
+@Composable
+private fun CapWarning() {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth().testTag("storage-cap-warning"),
+    ) {
+        Text(
+            stringResource(R.string.pin_cap_warning),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(horizontal = QuireTheme.spacing.md, vertical = QuireTheme.spacing.sm),
+        )
     }
 }
 

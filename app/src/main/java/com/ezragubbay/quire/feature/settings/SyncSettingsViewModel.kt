@@ -2,6 +2,8 @@ package com.ezragubbay.quire.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ezragubbay.quire.sync.OfflineSettings
+import com.ezragubbay.quire.sync.OfflineSettingsStore
 import com.ezragubbay.quire.sync.SyncInterval
 import com.ezragubbay.quire.sync.SyncRunner
 import com.ezragubbay.quire.sync.SyncSettings
@@ -19,6 +21,7 @@ import javax.inject.Inject
 data class SyncUiState(
     val settings: SyncSettings = SyncSettings(),
     val syncing: Boolean = false,
+    val offline: OfflineSettings = OfflineSettings(),
 )
 
 /** The Sync section's state and callbacks, bundled so [SettingsContent] stays one optional parameter wider. */
@@ -28,6 +31,13 @@ class SyncActions(
     val onIntervalSelected: (SyncInterval) -> Unit,
     val onWifiOnlyChanged: (Boolean) -> Unit,
     val onSyncNow: () -> Unit,
+    val offline: OfflineActions = OfflineActions(),
+)
+
+/** Offline-pinning controls in the Sync section: the summary-notification switch and the storage cap. */
+class OfflineActions(
+    val onNotifyChanged: (Boolean) -> Unit = {},
+    val onCapSelected: (Long) -> Unit = {},
 )
 
 /**
@@ -40,12 +50,14 @@ class SyncSettingsViewModel
     constructor(
         private val store: SyncSettingsStore,
         private val runner: SyncRunner,
+        private val offlineStore: OfflineSettingsStore,
     ) : ViewModel() {
         private val syncing = MutableStateFlow(false)
 
         val state: StateFlow<SyncUiState> =
-            combine(store.settings, syncing) { settings, busy -> SyncUiState(settings, busy) }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), SyncUiState())
+            combine(store.settings, syncing, offlineStore.settings) { settings, busy, offline ->
+                SyncUiState(settings, busy, offline)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), SyncUiState())
 
         fun onEnabledChanged(enabled: Boolean) {
             viewModelScope.launch { store.setEnabled(enabled) }
@@ -57,6 +69,14 @@ class SyncSettingsViewModel
 
         fun onWifiOnlyChanged(wifiOnly: Boolean) {
             viewModelScope.launch { store.setWifiOnly(wifiOnly) }
+        }
+
+        fun onNotifyChanged(notify: Boolean) {
+            viewModelScope.launch { offlineStore.setNotify(notify) }
+        }
+
+        fun onCapSelected(bytes: Long) {
+            viewModelScope.launch { offlineStore.setCapBytes(bytes) }
         }
 
         fun onSyncNow() {

@@ -7,6 +7,7 @@ import com.ezragubbay.quire.core.database.FileDao
 import com.ezragubbay.quire.core.download.DownloadItem
 import com.ezragubbay.quire.core.download.DownloadRepository
 import com.ezragubbay.quire.core.download.DownloadState
+import com.ezragubbay.quire.sync.PinController
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -75,6 +76,12 @@ internal interface DownloadsSourceModule {
     fun downloadsSource(impl: RepositoryDownloadsSource): DownloadsSource
 }
 
+/** Offline-pinning state the Downloads tab shows: which courses are pinned and whether the cap paused downloads. */
+data class PinUiState(
+    val pinned: Set<String> = emptySet(),
+    val capWarning: Boolean = false,
+)
+
 enum class DownloadRowStatus { Downloading, Done, Failed }
 
 data class DownloadRowUi(
@@ -92,6 +99,7 @@ data class DownloadGroupUi(
     val courseId: String,
     val courseName: String,
     val rows: List<DownloadRowUi>,
+    val pinned: Boolean = false,
 )
 
 sealed interface DownloadsUiState {
@@ -130,17 +138,23 @@ internal fun toUiState(
     items: List<DownloadItem>,
     bytes: Long,
     labels: DownloadLabels,
+    pinned: Set<String> = emptySet(),
 ): DownloadsUiState =
-    if (items.isEmpty()) {
+    if (items.isEmpty() && pinned.isEmpty()) {
         DownloadsUiState.Empty
     } else {
+        val byCourse = items.groupBy { it.courseSlug }
+        // A pinned course shows even with nothing downloaded yet (the cap may be holding its files back).
         DownloadsUiState.Content(
             groups =
-                items
-                    .groupBy { it.courseSlug }
-                    .map { (slug, rows) ->
-                        DownloadGroupUi(slug, labels.courseNames[slug] ?: slug, rows.map { it.toRow(labels) })
-                    },
+                (byCourse.keys + pinned).map { slug ->
+                    DownloadGroupUi(
+                        slug,
+                        labels.courseNames[slug] ?: slug,
+                        byCourse[slug].orEmpty().map { it.toRow(labels) },
+                        slug in pinned,
+                    )
+                },
             storageLabel = formatBytes(bytes),
         )
     }
@@ -150,18 +164,35 @@ class DownloadsViewModel
     @Inject
     constructor(
         private val source: DownloadsSource,
+        private val pins: PinController,
     ) : ViewModel() {
         private val latest = MutableStateFlow<List<DownloadItem>>(emptyList())
+
+        val pinning: StateFlow<PinUiState> =
+            combine(pins.observePinned(), pins.observeCapWarning(), ::PinUiState)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), PinUiState())
 
         val state: StateFlow<DownloadsUiState> =
             combine(
                 source.observeItems(),
                 source.observeStorageBytes(),
                 source.observeLabels(),
-            ) { items, bytes, labels ->
+                pins.observePinned(),
+            ) { items, bytes, labels, pinned ->
                 latest.value = items
-                toUiState(items, bytes, labels)
+                toUiState(items, bytes, labels, pinned)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), DownloadsUiState.Loading)
+
+        fun pin(slug: String) {
+            viewModelScope.launch { pins.pin(slug) }
+        }
+
+        fun unpin(
+            slug: String,
+            removeFiles: Boolean,
+        ) {
+            viewModelScope.launch { pins.unpin(slug, removeFiles) }
+        }
 
         fun remove(fileId: String) {
             viewModelScope.launch { source.remove(fileId) }

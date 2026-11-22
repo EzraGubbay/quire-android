@@ -12,6 +12,7 @@ import com.ezragubbay.quire.core.data.course.SyncState
 import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.feature.courses.files.FileSort
+import com.ezragubbay.quire.sync.FakePinController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -74,7 +75,7 @@ class CourseViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = CourseViewModel(SavedStateHandle(mapOf("slug" to "signals")), source)
+    private fun vm() = CourseViewModel(SavedStateHandle(mapOf("slug" to "signals")), source, FakePinController())
 
     private fun TestScope.latest(vm: CourseViewModel): () -> CourseUiState {
         var latest: CourseUiState = vm.state.value
@@ -101,7 +102,7 @@ class CourseViewModelTest {
     fun filesTab_filterAndSortSurviveRecreation() =
         runTest {
             val handle = SavedStateHandle(mapOf("slug" to "signals"))
-            val vm = CourseViewModel(handle, source)
+            val vm = CourseViewModel(handle, source, FakePinController())
             val ui = latest(vm)
             source.emit(
                 files =
@@ -117,7 +118,7 @@ class CourseViewModelTest {
             assertEquals(listOf(FileType.RECITATION), view.groups.map { it.type })
             assertEquals(FileSort.TITLE, view.sort)
 
-            val recreated = latest(CourseViewModel(handle, source))
+            val recreated = latest(CourseViewModel(handle, source, FakePinController()))
             assertEquals(setOf(FileType.RECITATION), (recreated() as CourseUiState.Content).filesView.selectedTypes)
 
             vm.toggleFileType(FileType.RECITATION)

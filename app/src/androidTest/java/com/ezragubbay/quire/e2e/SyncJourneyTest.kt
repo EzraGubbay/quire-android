@@ -19,9 +19,12 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.ezragubbay.quire.MainActivity
+import com.ezragubbay.quire.core.database.DownloadEntity
 import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.core.download.WorkManagerDownloadScheduler
+import com.ezragubbay.quire.sync.AutoDownloadPolicy
+import com.ezragubbay.quire.sync.OfflineSettingsStore
 import com.ezragubbay.quire.sync.SyncWorkerFactory
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
@@ -30,7 +33,6 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -101,6 +103,8 @@ class SyncJourneyTest {
 
     @Inject lateinit var syncWorkerFactory: SyncWorkerFactory
 
+    @Inject lateinit var offlineSettings: OfflineSettingsStore
+
     private var scenario: ActivityScenario<MainActivity>? = null
 
     /** Each case starts with a test WorkManager, no scheduled work, and no persisted downloads. */
@@ -128,7 +132,12 @@ class SyncJourneyTest {
             .result
             .get() // no sync/download work leaks between cases
         // Direct DAO/file reset: going through the repositories would touch WorkManager before the app starts.
-        runBlocking { db.downloadDao().deleteAll() }
+        runBlocking {
+            db.downloadDao().deleteAll()
+            // Pin state lives in the shared settings DataStore, which outlives a case: start each one unpinned.
+            offlineSettings.current().pinned.forEach { offlineSettings.removePin(it) }
+            offlineSettings.setCapBytes(AutoDownloadPolicy.DEFAULT_CAP_BYTES)
+        }
         context.cacheDir.resolve("viewer").deleteRecursively()
         context.filesDir.resolve("downloads").deleteRecursively()
     }
@@ -193,7 +202,6 @@ class SyncJourneyTest {
 
     // --- Offline pinning: un-ignored by QMOB-E7-S2 (#52) -----------------------------------------
 
-    @Ignore("QMOB-E7")
     @Test
     fun pinCourse_marksAvailableOffline_showsPinnedBadge() {
         enqueueCourses()
@@ -202,12 +210,12 @@ class SyncJourneyTest {
         openSignalsCourse()
 
         // 'Available offline' pins the course; a badge marks it as pinned.
+        awaitTag("action-pin-course")
         composeRule.onNodeWithTag("action-pin-course").performClick()
         awaitTag("pinned-badge")
         composeRule.onNodeWithTag("pinned-badge").assertIsDisplayed()
     }
 
-    @Ignore("QMOB-E7")
     @Test
     fun pinnedCourse_autoDownloadsSyncedFile_opensOffline() {
         enqueueCourses()
@@ -216,6 +224,7 @@ class SyncJourneyTest {
         openSignalsCourse()
 
         // Pin the course 'Available offline'.
+        awaitTag("action-pin-course")
         composeRule.onNodeWithTag("action-pin-course").performClick()
         awaitTag("pinned-badge")
         selectFilesTab()
@@ -226,6 +235,7 @@ class SyncJourneyTest {
         runPeriodicSync()
         awaitTag("file-row-$NEW_FILE_ID")
         meetDownloadConstraints(NEW_FILE_ID) // release the constrained one-time download
+        awaitDownloaded(NEW_FILE_ID) // finish streaming before the server vanishes
 
         // With the new file cached offline, the server can vanish and it still opens from disk.
         server.server.shutdown()
@@ -234,7 +244,6 @@ class SyncJourneyTest {
         composeRule.onNodeWithTag("pdf-page-1").assertIsDisplayed()
     }
 
-    @Ignore("QMOB-E7")
     @Test
     fun pinningOverStorageCap_showsWarning() {
         enqueueCourses()
@@ -242,9 +251,10 @@ class SyncJourneyTest {
         launch()
         openSignalsCourse()
 
-        // Pinning a course whose offline footprint would exceed the storage cap surfaces a warning
-        // (QMOB-E7-S2 drives the over-cap condition — a low test cap or an oversized-file fixture —
-        // and decides whether the pin is blocked or needs confirmation).
+        // Pinning a course whose offline footprint would exceed the storage cap surfaces a warning: the pin is
+        // kept, auto-download pauses, and the warning shows. A one-byte cap drives the over-cap condition.
+        runBlocking { offlineSettings.setCapBytes(1) }
+        awaitTag("action-pin-course")
         composeRule.onNodeWithTag("action-pin-course").performClick()
         awaitTag("storage-cap-warning")
         composeRule.onNodeWithTag("storage-cap-warning").assertIsDisplayed()
@@ -348,6 +358,13 @@ class SyncJourneyTest {
                 .first()
         requireNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setAllConstraintsMet(info.id)
         composeRule.waitForIdle()
+    }
+
+    /** Waits until the download for [fileId] has fully landed on disk (its Room row is DONE). */
+    private fun awaitDownloaded(fileId: String) {
+        composeRule.waitUntil(TIMEOUT_MS) {
+            runBlocking { db.downloadDao().get(fileId)?.state } == DownloadEntity.DONE
+        }
     }
 
     /** Waits until at least one node with [tag] is present (async Room/network/render settle). */

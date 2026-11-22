@@ -8,6 +8,7 @@ import com.ezragubbay.quire.core.download.DownloadRepository
 import com.ezragubbay.quire.core.download.DownloadScheduler
 import com.ezragubbay.quire.core.download.WorkManagerDownloadScheduler
 import com.ezragubbay.quire.core.network.ContentApi
+import com.ezragubbay.quire.sync.PinnedDownloadNotifier
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -36,7 +37,8 @@ object DownloadModule {
         dao: DownloadDao,
         api: ContentApi,
         paths: DownloadPaths,
-    ) = DownloadDeps(dao, api, paths)
+        notifier: PinnedDownloadNotifier,
+    ) = DownloadDeps(dao, api, paths, onSettled = notifier::onDownloadSettled)
 
     @Provides
     @Singleton

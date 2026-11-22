@@ -5,8 +5,14 @@ import com.ezragubbay.quire.core.data.course.CourseRepository
 import com.ezragubbay.quire.core.data.session.SessionRepository
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.core.database.QuireDatabase
+import com.ezragubbay.quire.core.download.DownloadRepository
 import com.ezragubbay.quire.sync.CourseSyncSource
+import com.ezragubbay.quire.sync.OfflinePinner
+import com.ezragubbay.quire.sync.OfflineSettingsStore
+import com.ezragubbay.quire.sync.PinController
+import com.ezragubbay.quire.sync.PinnedDownloadNotifier
 import com.ezragubbay.quire.sync.RepositoryCourseSyncSource
+import com.ezragubbay.quire.sync.RoomPinStorage
 import com.ezragubbay.quire.sync.SyncCoordinator
 import com.ezragubbay.quire.sync.SyncDeps
 import com.ezragubbay.quire.sync.SyncRunner
@@ -51,7 +57,47 @@ object SyncModule {
         source: CourseSyncSource,
         store: SyncSettingsStore,
         sessions: SessionRepository,
-    ) = SyncRunner(source, store, isSignedIn = { sessions.current() is SessionState.SignedIn })
+        pinned: OfflinePinner,
+    ) = SyncRunner(source, store, isSignedIn = { sessions.current() is SessionState.SignedIn }, pinned = pinned)
+
+    @Provides
+    @Singleton
+    fun offlineSettingsStore(
+        @ApplicationContext context: Context,
+    ) = OfflineSettingsStore(context)
+
+    @Provides
+    @Singleton
+    fun offlinePinner(
+        settings: OfflineSettingsStore,
+        syncStore: SyncSettingsStore,
+        db: QuireDatabase,
+        downloads: DownloadRepository,
+    ) = OfflinePinner(
+        settings,
+        RoomPinStorage(db.fileDao(), db.downloadDao(), downloads),
+        wifiOnly = { syncStore.current().wifiOnly },
+    )
+
+    @Provides
+    fun pinController(pinner: OfflinePinner): PinController = pinner
+
+    @Provides
+    @Singleton
+    fun pinnedDownloadNotifier(
+        @ApplicationContext context: Context,
+        settings: OfflineSettingsStore,
+        db: QuireDatabase,
+    ) = PinnedDownloadNotifier(
+        context,
+        settings,
+    ) { slug ->
+        db
+            .courseDao()
+            .getAll()
+            .firstOrNull { it.slug == slug }
+            ?.name
+    }
 
     @Provides
     @Singleton
