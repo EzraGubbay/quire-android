@@ -234,6 +234,10 @@ class SyncJourneyTest {
         enqueuePdf() // the auto-download streams the new file's PDF
         runPeriodicSync()
         awaitTag("file-row-$NEW_FILE_ID")
+        // The row shows once the files response is stored, but the pass queues the pinned download only after the
+        // course's last fetch (notes), then moves on to the next course. Let the pass's last request go out first:
+        // by then the download work exists, and its content request cannot be handed a response queued for the pass.
+        server.awaitRequest(LAST_SYNC_REQUEST)
         meetDownloadConstraints(NEW_FILE_ID) // release the constrained one-time download
         awaitDownloaded(NEW_FILE_ID) // finish streaming before the server vanishes
 
@@ -319,10 +323,16 @@ class SyncJourneyTest {
         awaitTag("screen-course")
     }
 
-    /** Switches the open course to its Files tab and waits for the list. */
+    /**
+     * Switches the open course to its Files tab and waits for the list, then for the course bundle's notes
+     * request. Call it once, after the course was opened with [enqueueCourseDetail] queued.
+     */
     private fun selectFilesTab() {
         composeRule.onNodeWithTag("tab-files").performClick()
         awaitTag("file-list")
+        // The course bundle's last fetch (notes) can still be on its way. Let it go out first, so the sync pass a
+        // case runs next cannot be handed the notes response.
+        server.awaitRequest("/notes")
     }
 
     /**
@@ -355,7 +365,8 @@ class SyncJourneyTest {
                 .getInstance(context)
                 .getWorkInfosForUniqueWork(WorkManagerDownloadScheduler.uniqueName(fileId))
                 .get()
-                .first()
+                .firstOrNull()
+        checkNotNull(info) { "No download work was enqueued for $fileId" }
         requireNotNull(WorkManagerTestInitHelper.getTestDriver(context)).setAllConstraintsMet(info.id)
         composeRule.waitForIdle()
     }
@@ -407,6 +418,9 @@ class SyncJourneyTest {
 
         /** Unique name the app schedules the periodic metadata sync under (QMOB-E7-S1). */
         const val SYNC_UNIQUE_WORK = "quire-sync"
+
+        /** A sync pass's last request: the detail fetch of the last course in list order (see [enqueueSyncBundle]). */
+        const val LAST_SYNC_REQUEST = "/courses/infi-1"
 
         /** The file added on the server between the initial open and the sync (in `course-files-synced.json`). */
         const val NEW_FILE_ID = "b2c3d4e5-6f70-4a81-9b2c-3d4e5f607182"
