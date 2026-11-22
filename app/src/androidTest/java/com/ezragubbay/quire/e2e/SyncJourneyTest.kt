@@ -108,6 +108,7 @@ class SyncJourneyTest {
         // Each case has a fresh Hilt graph (and Room instance); the delegating factory reads the current one.
         currentWorkerFactory = downloadWorkerFactory
         // Test WorkManager: scheduled work waits for the driver instead of a real interval / network event.
+        // WorkManager initialises once per process; later cases reuse it (the factory delegates to the current case's).
         runCatching {
             WorkManagerTestInitHelper.initializeTestWorkManager(
                 context,
@@ -117,7 +118,7 @@ class SyncJourneyTest {
                     .setWorkerFactory(DelegatingWorkerFactory)
                     .build(),
             )
-        } // WorkManager initialises once per process; later cases reuse it (the factory delegates to the current case's).
+        }
         WorkManager
             .getInstance(context)
             .cancelAllWork()
