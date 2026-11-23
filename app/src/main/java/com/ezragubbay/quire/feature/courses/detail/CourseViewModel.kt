@@ -16,6 +16,7 @@ import com.ezragubbay.quire.feature.courses.files.FilesView
 import com.ezragubbay.quire.feature.courses.files.buildFilesView
 import com.ezragubbay.quire.feature.courses.files.parseSelectedTypes
 import com.ezragubbay.quire.feature.courses.files.tag
+import com.ezragubbay.quire.sync.PinController
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -117,6 +119,10 @@ sealed interface CourseUiState {
         val notes: List<CourseNote>,
         /** Network is down but cached data is shown. */
         val offline: Boolean,
+        /** The course is pinned 'Available offline'. */
+        val pinned: Boolean = false,
+        /** The storage cap is holding auto-download back. */
+        val capWarning: Boolean = false,
     ) : CourseUiState
 }
 
@@ -131,6 +137,8 @@ private data class Bundle(
     val sessions: List<CourseSession>,
     val files: List<CourseFile>,
     val notes: List<CourseNote>,
+    /** (pinned, cap warning). */
+    val pin: Pair<Boolean, Boolean>,
 )
 
 private fun toUiState(
@@ -182,6 +190,8 @@ private fun toUiState(
         filesView = buildFilesView(bundle.files, fileTypes, fileSort),
         notes = bundle.notes,
         offline = (state as? SyncState.Failed)?.isOffline == true,
+        pinned = bundle.pin.first,
+        capWarning = bundle.pin.second,
     )
 }
 
@@ -192,6 +202,7 @@ class CourseViewModel
     constructor(
         private val savedState: SavedStateHandle,
         private val source: CourseSource,
+        private val pins: PinController,
     ) : ViewModel() {
         // Type-safe navigation puts the route's `slug` argument in the SavedStateHandle.
         private val slug: String = checkNotNull(savedState["slug"])
@@ -205,16 +216,24 @@ class CourseViewModel
 
         private val selection = combine(selectedFilter, fileTypes, fileSort) { f, t, s -> Triple(f, t, s) }
 
+        /** (pinned, cap warning) for this course. */
+        private val pinState =
+            combine(pins.observePinned(), pins.observeCapWarning()) { pinned, warn ->
+                (slug in pinned) to
+                    warn
+            }
+
         val state: StateFlow<CourseUiState> =
             combine(
                 source.observeCourse(slug),
                 source.observeSessions(slug),
                 source.observeFiles(slug),
                 source.observeNotes(slug),
-                selection,
-            ) { detail, sessions, files, notes, (selected, types, sort) ->
+                combine(selection, pinState) { sel, pin -> sel to pin },
+            ) { detail, sessions, files, notes, (sel, pin) ->
+                val (selected, types, sort) = sel
                 toUiState(
-                    Bundle(detail, sessions.data, files.data, notes.data),
+                    Bundle(detail, sessions.data, files.data, notes.data, pin),
                     SessionKind.entries.firstOrNull { it.key == selected },
                     slug,
                     parseSelectedTypes(types),
@@ -235,6 +254,22 @@ class CourseViewModel
 
         fun selectFileSort(sort: FileSort) {
             savedState[FILE_SORT_KEY] = sort.key
+        }
+
+        /**
+         * Pins the course 'Available offline'. Waits for the course's first refresh to settle so the file list the
+         * pin downloads from is the loaded one (a pin made mid-load would queue nothing).
+         */
+        fun pin() {
+            viewModelScope.launch {
+                source.observeFiles(slug).first { it.state is SyncState.Synced || it.state is SyncState.Failed }
+                pins.pin(slug)
+            }
+        }
+
+        /** Unpins; [removeFiles] also deletes the downloaded files. */
+        fun unpin(removeFiles: Boolean) {
+            viewModelScope.launch { pins.unpin(slug, removeFiles) }
         }
 
         /** Retry from the error state. */

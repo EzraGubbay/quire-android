@@ -29,7 +29,24 @@ class DownloadDeps(
     val paths: DownloadPaths,
     val clock: () -> Long = System::currentTimeMillis,
     val openSink: (file: File, append: Boolean) -> OutputStream = { f, append -> FileOutputStream(f, append) },
-)
+    /** Called once a download reaches a final state (done, or failed for good); pinned-course batches listen. */
+    val onSettled: suspend (courseSlug: String, fileId: String, success: Boolean) -> Unit = { _, _, _ -> },
+) {
+    /** Runs [onSettled]; a listener failure must never fail the download itself. */
+    suspend fun notifySettled(
+        courseSlug: String,
+        fileId: String,
+        success: Boolean,
+    ) {
+        try {
+            onSettled(courseSlug, fileId, success)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Best effort: the summary notification is optional.
+        }
+    }
+}
 
 /**
  * Streams one file's content into `<name>.part`, resuming with `Range` + `If-Range` (stored ETag), then atomically
@@ -164,6 +181,7 @@ class DownloadWorker(
                 error = null,
             )
         }
+        deps.notifySettled(courseSlug, fileId, true)
         return Result.success()
     }
 
@@ -190,6 +208,7 @@ class DownloadWorker(
 
     private suspend fun fail(message: String): Result {
         mutate { it.copy(state = DownloadEntity.FAILED, error = message) }
+        deps.notifySettled(courseSlug, fileId, false)
         return Result.failure()
     }
 

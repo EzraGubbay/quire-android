@@ -24,6 +24,7 @@ import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.testing.MockWebServerRule
 import com.ezragubbay.quire.testing.SessionSeedRule
+import com.ezragubbay.quire.testing.Smoke
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
@@ -127,6 +128,7 @@ class ReaderJourneyTest {
     // --- PDF viewer & resume: un-ignored by QMOB-E5-S2 (#37) ------------------------------------
 
     @Test
+    @Smoke("open-pdf")
     fun openDeck_rendersFirstPage_withPageIndicator() {
         enqueueReaderBundle()
         launch()

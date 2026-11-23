@@ -2,6 +2,7 @@ package com.ezragubbay.quire.feature.downloads
 
 import com.ezragubbay.quire.core.download.DownloadItem
 import com.ezragubbay.quire.core.download.DownloadState
+import com.ezragubbay.quire.sync.FakePinController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,7 +67,7 @@ class DownloadsViewModelTest {
         size: Long = 2048,
     ) = item(id, course, DownloadState.Done("/p/$id", size))
 
-    private fun newVm() = DownloadsViewModel(source)
+    private fun newVm() = DownloadsViewModel(source, FakePinController())
 
     private fun kotlinx.coroutines.test.TestScope.content(vm: DownloadsViewModel): () -> DownloadsUiState {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }

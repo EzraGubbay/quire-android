@@ -4,7 +4,9 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.ezragubbay.quire.core.designsystem.theme.ThemeMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -60,7 +62,9 @@ class SettingsRepositoryTest {
             val firstScope = CoroutineScope(Dispatchers.IO)
             SettingsRepository(PreferenceDataStoreFactory.create(scope = firstScope) { file })
                 .setThemeMode(ThemeMode.Light)
-            firstScope.cancel()
+            // Join, not just cancel: DataStore releases the file's single-instance lock only once its scope has
+            // completed, so reopening straight after an async cancel() races "multiple DataStores for the same file".
+            firstScope.coroutineContext[Job]!!.cancelAndJoin()
             val reopened = repo(file)
             assertEquals(ThemeMode.Light, reopened.settings.first().themeMode)
         }
