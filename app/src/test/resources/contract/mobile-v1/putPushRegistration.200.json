@@ -1,0 +1,15 @@
+{
+  "registration": {
+    "deviceId": "<mobile_tokens.id>",
+    "platform": "android",
+    "appVersion": "1.1.0",
+    "categories": [
+      "files",
+      "deadlines",
+      "notes"
+    ],
+    "createdAt": "2026-11-24T09:00:00.000Z",
+    "updatedAt": "2026-11-24T09:00:00.000Z"
+  },
+  "pushEnabled": true
+}
