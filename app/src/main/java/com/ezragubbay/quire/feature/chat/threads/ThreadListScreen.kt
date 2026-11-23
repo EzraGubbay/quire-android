@@ -118,6 +118,9 @@ internal fun ThreadListContent(
                     .align(Alignment.BottomEnd)
                     .padding(QuireTheme.spacing.md)
                     .testTag("action-new-thread"),
+            // The primary action: the oxblood button fill, as on the web app.
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
         )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
