@@ -12,6 +12,7 @@ import com.ezragubbay.quire.core.network.QuireApi
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
+import com.ezragubbay.quire.push.PushSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,7 +54,7 @@ class AppViewModelTest {
         scope.cancel()
     }
 
-    private class FakeApi : QuireApi {
+    private inner class FakeApi : QuireApi {
         var me: () -> Response<MeResponse> = { Response.success(MeResponse("ezra", "v1", DeviceDto("d1", "Pixel"))) }
         var revoke: () -> Response<Unit> = { Response.success(Unit) }
         var meCalls = 0
@@ -68,6 +69,7 @@ class AppViewModelTest {
 
         override suspend fun revokeToken(): Response<Unit> {
             revokeCalls++
+            order += "revoke"
             return revoke.invoke()
         }
 
@@ -86,6 +88,31 @@ class AppViewModelTest {
             noteId: String,
         ) = error("unused")
     }
+
+    /** The order the session lifecycle reaches the server and the push hooks in. */
+    private val order = mutableListOf<String>()
+
+    private inner class FakePush : PushSession {
+        override fun onAppStart() {
+            order += "push.appStart"
+        }
+
+        override fun onResume() = Unit
+
+        override fun onSignedIn() {
+            order += "push.signedIn"
+        }
+
+        override suspend fun unregisterRemote() {
+            order += "push.unregister"
+        }
+
+        override fun onSignedOut() {
+            order += "push.signedOut"
+        }
+    }
+
+    private val push = FakePush()
 
     private val api = FakeApi()
     private val events = SessionEvents()
@@ -107,7 +134,7 @@ class AppViewModelTest {
 
     private suspend fun signedInSession() = sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
 
-    private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api))
+    private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api), push)
 
     /** A repository whose eager state collection and persistence run on [scope], so a test scheduler can drive them. */
     private fun sessionsOn(
@@ -143,7 +170,7 @@ class AppViewModelTest {
                 sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
                 advanceUntilIdle()
 
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api))
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push)
                 advanceUntilIdle()
 
                 assertEquals(true, vm.signedIn.value)
@@ -226,7 +253,7 @@ class AppViewModelTest {
                 sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
                 advanceUntilIdle()
 
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api))
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push)
                 advanceUntilIdle()
 
                 vm.validateSession()
@@ -302,5 +329,43 @@ class AppViewModelTest {
 
             assertTrue(vm.signedIn.value == true)
             assertFalse(vm.sessionExpired.value)
+        }
+
+    @Test
+    fun signOut_deletesPushRegistration_thenRevokes_thenDropsTheLocalToken() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            vm.signOut().join()
+
+            assertEquals(listOf("push.unregister", "revoke", "push.signedOut"), order)
+        }
+
+    @Test
+    fun pairing_registersForPush() =
+        runBlocking {
+            val vm = vm()
+            vm.resolved()
+
+            vm.onSignedIn()
+
+            assertEquals(listOf("push.signedIn"), order)
+        }
+
+    @Test
+    fun sessionExpiry_runsOnlyTheLocalPushHalf() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            events.emitExpired()
+            vm.signedIn.first { it == false }
+
+            assertEquals(listOf("push.signedOut"), order)
         }
 }
