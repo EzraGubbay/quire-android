@@ -53,7 +53,7 @@ android {
         // behind, and every later journey opening the same file resumed there instead of on page 1.
         // Needs the orchestrator (testOptions.execution) and the test-services APK (androidTestUtil).
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
-        // The minified build runs only the smoke subset (launch, pair, courses, open PDF, chat stream).
+        // The minified build runs only the smoke subset (launch, pair, courses, open PDF, chat stream, chat math).
         if (testBuildTypeName == "minified") {
             testInstrumentationRunnerArguments["annotation"] = "com.ezragubbay.quire.testing.Smoke"
         }
