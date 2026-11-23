@@ -121,10 +121,10 @@ Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E
 
 ### v1.0.0 — Sprint 5 — Sync & Release (v1.0.0)
 
-- [ ] `SyncJourneyTest` green; upload stories shipped or explicitly deferred by the human.
-- [ ] Signed APK published by the release workflow as a GitHub Release (one APK + checksum).
-- [ ] Obtainium installs and updates the app on the OnePlus 15R (QMOB-E9-S5).
-- [ ] Release PR `dev-rc` → `main` green: `build`, `lint`, `unit-tests`, `e2e`.
+- [x] `SyncJourneyTest` green; upload stories shipped or explicitly deferred by the human. _(E7-S0/S1/S2 shipped; upload stories E7-S3/S4/S5 deferred past v1.0.0 — #53/#54/#55)_
+- [ ] Signed APK published by the release workflow as a GitHub Release (one APK + checksum). _(human: set signing secrets, then tag `v1.0.0`)_
+- [ ] Obtainium installs and updates the app on the OnePlus 15R (QMOB-E9-S5). _(human on-device acceptance — see #60, incl. obfuscated-release check)_
+- [ ] Release PR `dev-rc` → `main` green: `build`, `lint`, `unit-tests`, `e2e`. _(ticks when this PR's CI is green)_
 
 | Story | Issue | Title | Size | Status |
 |---|---|---|---|---|
