@@ -50,8 +50,10 @@ import com.ezragubbay.quire.feature.viewer.pdf.PdfViewerScreen
 import com.ezragubbay.quire.push.PushTarget
 import com.ezragubbay.quire.push.PushTargetMissing
 import com.ezragubbay.quire.push.PushTargetResolver
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 const val ACTION_SETTINGS_TAG = "action-settings"
 const val ACTION_SEARCH_TAG = "action-search"
@@ -225,12 +227,16 @@ internal fun PushTargetEffect(
     LaunchedEffect(target) {
         if (target == null) return@LaunchedEffect
         val resolution = resolver.resolve(target)
-        // The nested graph is set during the first layout pass; wait for its start destination before navigating.
-        navController.currentBackStackEntryFlow.first()
-        navController.openPushTarget(resolution.target)
-        // Outlives this effect, which restarts (and is cancelled) once the target is consumed.
-        resolution.missing?.let { missing -> scope.launch { snackbar.showSnackbar(messages.getValue(missing)) } }
-        onConsumed(target)
+        // The check finishes on a network thread and nothing guarantees the effect resumes on the main thread (the
+        // Compose test clock resumes it in place), but NavController must only be touched there.
+        withContext(Dispatchers.Main.immediate) {
+            // The nested graph is set during the first layout pass; wait for its start destination before navigating.
+            navController.currentBackStackEntryFlow.first()
+            navController.openPushTarget(resolution.target)
+            // Outlives this effect, which restarts (and is cancelled) once the target is consumed.
+            resolution.missing?.let { missing -> scope.launch { snackbar.showSnackbar(messages.getValue(missing)) } }
+            onConsumed(target)
+        }
     }
 }
 

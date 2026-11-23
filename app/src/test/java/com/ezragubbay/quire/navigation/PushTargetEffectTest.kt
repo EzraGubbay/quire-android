@@ -98,6 +98,21 @@ class PushTargetEffectTest {
     }
 
     @Test
+    fun aCheckFinishingOnAnotherThread_stillNavigatesOnTheMainThread() {
+        val check = CompletableDeferred<PushTargetResolution>()
+        setContent { check.await() }
+        val file = PushTarget.File("c", "f1")
+        tap(file)
+
+        // Like the network check: the answer arrives on a background thread.
+        Thread { check.complete(PushTargetResolution(file)) }.apply { start() }.join()
+        rule.waitForIdle()
+
+        assertEquals(listOf("CoursesRoute", "CourseRoute", "ViewerRoute"), stack())
+        assertEquals(listOf<PushTarget>(file), consumed)
+    }
+
+    @Test
     fun missingFile_opensTheCourse_andShowsTheSnackbar() {
         setContent { PushTargetResolution(PushTarget.Course("c"), PushTargetMissing.File) }
 
