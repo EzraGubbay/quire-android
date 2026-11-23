@@ -3,8 +3,8 @@ package com.ezragubbay.quire.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.ezragubbay.quire.core.designsystem.icon.QuireIcons
 import kotlinx.serialization.Serializable
 
 /** Type-safe navigation routes. */
@@ -29,7 +29,7 @@ enum class TopLevelDestination(
     val screenTag: String,
 ) {
     Courses(CoursesRoute, "Courses", Icons.Filled.Home, "nav-courses", "screen-courses"),
-    Downloads(DownloadsRoute, "Downloads", Icons.Filled.KeyboardArrowDown, "nav-downloads", "screen-downloads"),
+    Downloads(DownloadsRoute, "Downloads", QuireIcons.ArchiveBoxArrowDown, "nav-downloads", "screen-downloads"),
     Chats(ChatsRoute, "Chats", Icons.AutoMirrored.Filled.Send, "nav-chats", "screen-chats"),
     ;
 
