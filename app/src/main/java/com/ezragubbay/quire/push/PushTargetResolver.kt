@@ -61,8 +61,11 @@ class ApiPushTargetResolver(
                     }
                 }
             when {
-                course.await() is ApiResult.Failure.NotFound ->
+                course.await() is ApiResult.Failure.NotFound -> {
+                    // The course is gone: the file / note answer cannot change the outcome.
+                    item.cancel()
                     PushTargetResolution(PushTarget.Home, PushTargetMissing.Course)
+                }
                 item.await() !is ApiResult.Failure.NotFound -> PushTargetResolution(target)
                 target is PushTarget.Note -> PushTargetResolution(PushTarget.Course(slug), PushTargetMissing.Note)
                 else -> PushTargetResolution(PushTarget.Course(slug), PushTargetMissing.File)

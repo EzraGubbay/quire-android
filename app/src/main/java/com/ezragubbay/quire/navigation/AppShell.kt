@@ -203,7 +203,7 @@ fun AppShell(
  * target is reported consumed only after navigating, so a recomposition or recreate mid-check simply checks again.
  */
 @Composable
-private fun PushTargetEffect(
+internal fun PushTargetEffect(
     target: PushTarget?,
     resolver: PushTargetResolver,
     navController: NavHostController,
@@ -211,12 +211,17 @@ private fun PushTargetEffect(
     onConsumed: (PushTarget) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val fileGone = stringResource(R.string.push_target_missing_file)
+    val noteGone = stringResource(R.string.push_target_missing_note)
+    val courseGone = stringResource(R.string.push_target_missing_course)
     val messages =
-        mapOf(
-            PushTargetMissing.File to stringResource(R.string.push_target_missing_file),
-            PushTargetMissing.Note to stringResource(R.string.push_target_missing_note),
-            PushTargetMissing.Course to stringResource(R.string.push_target_missing_course),
-        )
+        remember(fileGone, noteGone, courseGone) {
+            mapOf(
+                PushTargetMissing.File to fileGone,
+                PushTargetMissing.Note to noteGone,
+                PushTargetMissing.Course to courseGone,
+            )
+        }
     LaunchedEffect(target) {
         if (target == null) return@LaunchedEffect
         val resolution = resolver.resolve(target)
@@ -229,10 +234,16 @@ private fun PushTargetEffect(
     }
 }
 
-/** Resets the shell to Courses, then pushes the target's course and file / note so back walks out the same way. */
+/**
+ * Pops the shell back to Courses (kept, with its ViewModel), then pushes the target's course and file / note so back
+ * walks out the same way.
+ */
 private fun NavHostController.openPushTarget(target: PushTarget) {
     val stack = target.backStack()
-    navigate(stack.first()) { popUpTo(graph.id) { inclusive = true } }
+    navigate(stack.first()) {
+        popUpTo(graph.findStartDestination().id)
+        launchSingleTop = true
+    }
     stack.drop(1).forEach { navigate(it) }
 }
 

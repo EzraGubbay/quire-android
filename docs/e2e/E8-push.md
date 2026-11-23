@@ -103,6 +103,7 @@ Reused: `action-settings`, `screen-settings` (E2), `action-sign-out`, `screen-pa
 | `homeworkDue_tapOpensSheet` | QMOB-E8-S4 (#64) |
 | `noteSynthesized_ready_tapOpensNoteReader` | QMOB-E8-S4 (#64) |
 | `deletedFile_tapFallsBackToCourseWithMessage` | QMOB-E8-S4 (#64) |
+| `filesAdded_tapWhileRunning_replacesBackStack` (added by the story; never Ignored) | QMOB-E8-S4 (#64) |
 | `categoryOff_putsCategories_andSuppressesNotification` | QMOB-E8-S5 (#65) |
 | `sendTest_postsTestNotification` | QMOB-E8-S5 (#65) |
 

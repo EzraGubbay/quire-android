@@ -58,6 +58,8 @@ class AppViewModel
         /**
          * The tapped notification's target, until the shell navigates to it and calls [onPushTargetConsumed]. Held
          * while [signedIn] is `null` (the shell is not composed yet); dropped whenever the session is signed out.
+         * Memory only: a target not yet opened is lost on process death (the restored activity never replays the
+         * tap), so the app then reopens where it was.
          */
         val pendingPushTarget: StateFlow<PushTarget?> = _pendingPushTarget.asStateFlow()
 

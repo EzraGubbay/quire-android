@@ -31,6 +31,9 @@ class PushTargetResolverTest {
     /** Answers every request after this long (to force the resolver's timeout). */
     private var delayMillis = 0L
 
+    /** Per-path answer delays, on top of [delayMillis]. */
+    private val pathDelays = Collections.synchronizedMap(mutableMapOf<String, Long>())
+
     private var serverError = false
 
     @Before
@@ -50,7 +53,8 @@ class PushTargetResolverTest {
                             path == "/courses/$COURSE/notes/$NOTE" -> fixtureResponse("getNote.200.json")
                             else -> fixtureResponse("error.not_found.json", 404)
                         }
-                    return response.setHeadersDelay(delayMillis, TimeUnit.MILLISECONDS)
+                    val delay = delayMillis + (pathDelays[path] ?: 0L)
+                    return response.setHeadersDelay(delay, TimeUnit.MILLISECONDS)
                 }
             }
         server.start()
@@ -97,7 +101,7 @@ class PushTargetResolverTest {
         }
 
     @Test
-    fun file_200_opensTheFile() =
+    fun file_200_checksCourseAndFile_opensTheFile() =
         runBlocking {
             val target = PushTarget.File(COURSE, FILE)
             assertEquals(PushTargetResolution(target), resolver().resolve(target))
@@ -123,6 +127,34 @@ class PushTargetResolverTest {
                 PushTargetResolution(PushTarget.Home, PushTargetMissing.Course),
                 resolver().resolve(PushTarget.File(COURSE, FILE)),
             )
+        }
+
+    @Test
+    fun courseAndFile_areCheckedInParallel() =
+        runBlocking {
+            // Each answer takes 1 s; within a 1.8 s budget only concurrent checks can see the file's 404.
+            pathDelays["/courses/$COURSE"] = 1_000
+            pathDelays["/courses/$COURSE/files/$FILE"] = 1_000
+            missing += "/courses/$COURSE/files/$FILE"
+
+            assertEquals(
+                PushTargetResolution(PushTarget.Course(COURSE), PushTargetMissing.File),
+                resolver(timeoutMillis = 1_800).resolve(PushTarget.File(COURSE, FILE)),
+            )
+        }
+
+    @Test
+    fun course_404_whileTheFileCallIsSlow_returnsWithoutWaitingForIt() =
+        runBlocking {
+            missing += "/courses/$COURSE"
+            pathDelays["/courses/$COURSE/files/$FILE"] = 3_000
+            val started = System.nanoTime()
+
+            val resolution = resolver().resolve(PushTarget.File(COURSE, FILE))
+
+            assertEquals(PushTargetResolution(PushTarget.Home, PushTargetMissing.Course), resolution)
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            assertTrue("dropped the file call instead of waiting for it: $elapsedMs ms", elapsedMs < 2_000)
         }
 
     @Test

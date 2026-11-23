@@ -48,6 +48,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Ignore
@@ -73,7 +74,9 @@ import javax.inject.Inject
  * hands out the fixed [FakeFcmTokenSource.TOKEN]. A "push" is injected by building
  * `RemoteMessage.Builder("quire@fcm.googleapis.com").setData(map).build()` and passing `.data` to the app's
  * [PushMessageHandler] — the same call `QuireMessagingService.onMessageReceived` makes. Notifications are asserted
- * through `NotificationManager.activeNotifications` (channel, tag) and opened with `contentIntent.send()`.
+ * through `NotificationManager.activeNotifications` (channel, tag) and opened by sending their `contentIntent` (see
+ * [tap]: with the background-start opt-in a System UI tap carries, then waiting for `MainActivity` to resume). Every
+ * tap case cold-starts the app except [filesAdded_tapWhileRunning_replacesBackStack], which taps while it runs.
  * `POST_NOTIFICATIONS` is granted up front ([GrantPermissionRule]).
  *
  * UI is found by **test tag only** (the contract in `docs/e2e/E8-push.md`).
@@ -237,6 +240,35 @@ class PushJourneyTest {
         composeRule.onNodeWithTag("screen-pdf-viewer").assertDoesNotExist()
     }
 
+    // Added by QMOB-E8-S4 (#64): a tap while the app runs reaches the same activity (onNewIntent) and replaces the
+    // shell's back stack, so back walks target -> course -> Courses, not back into the tab that was open.
+    @Test
+    fun filesAdded_tapWhileRunning_replacesBackStack() {
+        seedSignedIn()
+        launch()
+        awaitTag("screen-courses")
+        composeRule.onNodeWithTag("nav-chats").performClick()
+        awaitTag("screen-chats")
+        val running = resumedMainActivity()
+        assertNotNull(running)
+        inject(pushData("push-files-added.json"))
+
+        tap(FILES_TAG)
+
+        awaitTag("screen-pdf-viewer")
+        assertSame("the tap must be delivered to the running activity", running, resumedMainActivity())
+        Espresso.pressBack()
+        awaitTag("screen-course")
+        Espresso.pressBack()
+        awaitTag("screen-courses")
+        composeRule.onNodeWithTag("screen-chats").assertDoesNotExist()
+        // The tabs still work after the reset.
+        composeRule.onNodeWithTag("nav-chats").performClick()
+        awaitTag("screen-chats")
+        composeRule.onNodeWithTag("nav-courses").performClick()
+        awaitTag("screen-courses")
+    }
+
     // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun homeworkDue_tapOpensSheet() {
@@ -338,37 +370,40 @@ class PushJourneyTest {
     }
 
     /**
-     * Opens the notification tagged [tag] the way a tap does, then waits for `MainActivity` to be resumed (the tap
-     * cold-starts it; until it is, there is no compose hierarchy to query). System UI sends a real tap with its own
-     * background-start privilege; this test is the sender here, so it opts in to the same for the send.
+     * Opens the notification tagged [tag] the way a tap does, then waits for `MainActivity` to be resumed (a tap on
+     * a closed app cold-starts it; until it is, there is no compose hierarchy to query). System UI sends a real tap
+     * with its own background-start privilege; this test is the sender here, so it opts in to the same for the send.
      */
     private fun tap(tag: String) {
         val notification = awaitNotification(tag).notification
         assertNotNull(notification.contentIntent)
         notification.contentIntent.send(context, 0, null, null, null, null, tapOptions())
-        awaitCondition { mainActivityResumed() }
+        awaitCondition { resumedMainActivity() != null }
         composeRule.waitForIdle()
     }
 
-    private fun tapOptions(): Bundle? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            @Suppress("DEPRECATION") // MODE_..._ALLOW_ALWAYS replaces it on API 36; the CI emulator is API 34.
-            ActivityOptions
-                .makeBasic()
-                .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
-                .toBundle()
-        } else {
-            null
-        }
+    private fun tapOptions(): Bundle? {
+        val mode =
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA ->
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+                    @Suppress("DEPRECATION") // Replaced by ALLOW_ALWAYS on API 36; still the one API 34-35 know.
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                else -> return null
+            }
+        return ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(mode).toBundle()
+    }
 
-    private fun mainActivityResumed(): Boolean {
-        var resumed = false
+    private fun resumedMainActivity(): MainActivity? {
+        var resumed: MainActivity? = null
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             resumed =
                 ActivityLifecycleMonitorRegistry
                     .getInstance()
                     .getActivitiesInStage(Stage.RESUMED)
-                    .any { it is MainActivity }
+                    .filterIsInstance<MainActivity>()
+                    .firstOrNull()
         }
         return resumed
     }
