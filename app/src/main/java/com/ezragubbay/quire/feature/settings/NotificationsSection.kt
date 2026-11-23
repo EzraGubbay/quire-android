@@ -19,6 +19,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,7 +32,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.ezragubbay.quire.R
@@ -36,7 +39,8 @@ import com.ezragubbay.quire.core.designsystem.component.SectionHeader
 import com.ezragubbay.quire.push.PushCategory
 import com.ezragubbay.quire.push.appNotificationSettings
 import com.ezragubbay.quire.push.channelSettingsIntent
-import com.ezragubbay.quire.push.findActivity
+import com.ezragubbay.quire.push.permissionDialogWasBlocked
+import com.ezragubbay.quire.push.showsNotificationRationale
 
 const val SETTINGS_NOTIFICATIONS_TAG = "settings-notifications"
 
@@ -50,26 +54,29 @@ internal fun NotificationsSection(notifications: NotificationActions) {
     val state = notifications.state
     val context = LocalContext.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { notifications.onResume() }
+    // Captured when the request starts, read in the result: survives a configuration change while the dialog is up.
+    var requestedBefore by rememberSaveable { mutableStateOf(false) }
+    var rationaleBefore by rememberSaveable { mutableStateOf(false) }
     val launcher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+            val blocked =
+                permissionDialogWasBlocked(
+                    granted = allowed,
+                    requestedBefore = requestedBefore,
+                    rationaleBefore = rationaleBefore,
+                    rationaleAfter = context.showsNotificationRationale(),
+                )
+            // The system no longer shows its dialog: the app's notification settings are the only way to allow it.
+            if (blocked) context.startActivity(appNotificationSettings(context))
             notifications.onPermissionResult()
         }
-    // Asks in context (Android 13+ only; below that there is nothing to ask). Once the system will no longer show its
-    // dialog, it opens the app's notification settings instead.
+    // Asks in context (Android 13+ only; below that there is nothing to ask), always through the system first.
     val askPermission = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val permission = Manifest.permission.POST_NOTIFICATIONS
-            val activity = context.findActivity()
-            val dialogBlocked =
-                state.permissionRequestedBefore &&
-                    activity != null &&
-                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
-            if (dialogBlocked) {
-                context.startActivity(appNotificationSettings(context))
-            } else {
-                notifications.onPermissionRequested()
-                launcher.launch(permission)
-            }
+            requestedBefore = state.permissionRequestedBefore
+            rationaleBefore = context.showsNotificationRationale()
+            notifications.onPermissionRequested()
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
     Column(modifier = Modifier.testTag(SETTINGS_NOTIFICATIONS_TAG)) {
