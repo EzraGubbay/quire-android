@@ -25,7 +25,7 @@ class PushTargetTest {
     ): Intent =
         Intent(context, MainActivity::class.java)
             .setAction(PushTarget.ACTION_OPEN_FROM_PUSH)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .addFlags(TAP_FLAGS)
             .apply { target.extras(type).forEach { (key, value) -> putExtra(key, value) } }
 
     private fun pushIntent(vararg extras: Pair<String, String?>): Intent =
@@ -131,7 +131,9 @@ class PushTargetTest {
         )
         assertEquals(
             PushTarget.Course("c"),
-            PushTarget.fromIntent(pushIntent(PushTarget.EXTRA_TYPE to PushEvent.TYPE_NOTE_SYNTHESIZED, "course" to "c")),
+            PushTarget.fromIntent(
+                pushIntent(PushTarget.EXTRA_TYPE to PushEvent.TYPE_NOTE_SYNTHESIZED, "course" to "c"),
+            ),
         )
     }
 
@@ -190,5 +192,10 @@ class PushTargetTest {
             listOf(CoursesRoute, CourseRoute("c"), NoteReaderRoute("c", "n1")),
             PushTarget.Note("c", "n1").backStack(),
         )
+    }
+
+    private companion object {
+        const val TAP_FLAGS =
+            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
     }
 }

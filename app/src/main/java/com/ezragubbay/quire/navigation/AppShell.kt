@@ -10,10 +10,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -41,21 +47,35 @@ import com.ezragubbay.quire.feature.notes.NoteReaderScreen
 import com.ezragubbay.quire.feature.search.SearchScreen
 import com.ezragubbay.quire.feature.settings.SettingsScreen
 import com.ezragubbay.quire.feature.viewer.pdf.PdfViewerScreen
+import com.ezragubbay.quire.push.PushTarget
+import com.ezragubbay.quire.push.PushTargetMissing
+import com.ezragubbay.quire.push.PushTargetResolver
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 const val ACTION_SETTINGS_TAG = "action-settings"
 const val ACTION_SEARCH_TAG = "action-search"
+const val PUSH_TARGET_MISSING_TAG = "push-target-missing"
 
 /**
  * The app shell: top bar (Settings action), bottom bar (Courses, Downloads, Chats) and the nav host.
  * Settings is pushed over the shell with its own top bar (back arrow) instead of this chrome.
+ *
+ * A tapped notification's [pushTarget] is checked with [pushTargetResolver], opened along its back stack
+ * (Courses → course → file / note) and then reported with [onPushTargetConsumed] (ADR 0003 §4.5).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppShell(
     account: SessionState.SignedIn? = null,
     onSignOut: () -> Unit = {},
+    pushTarget: PushTarget? = null,
+    pushTargetResolver: PushTargetResolver = PushTargetResolver.Unchecked,
+    onPushTargetConsumed: (PushTarget) -> Unit = {},
     navController: NavHostController = rememberNavController(),
 ) {
+    val snackbar = remember { SnackbarHostState() }
+    PushTargetEffect(pushTarget, pushTargetResolver, navController, snackbar, onPushTargetConsumed)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
     // Settings, a course and search bring their own top bar; the shell chrome is hidden for them.
@@ -71,6 +91,10 @@ fun AppShell(
 
     Scaffold(
         modifier = Modifier.testTag(APP_ROOT_TAG),
+        snackbarHost = {
+            // The shell's only snackbar: a tapped notification whose file, note or course is gone.
+            SnackbarHost(snackbar) { Snackbar(it, Modifier.testTag(PUSH_TARGET_MISSING_TAG)) }
+        },
         topBar = {
             // Settings brings its own large top bar (with back).
             if (!onSettings) {
@@ -172,6 +196,44 @@ fun AppShell(
             }
         }
     }
+}
+
+/**
+ * Consumes a tapped notification's [target] once: checks it, opens what is still there and says what is not. The
+ * target is reported consumed only after navigating, so a recomposition or recreate mid-check simply checks again.
+ */
+@Composable
+private fun PushTargetEffect(
+    target: PushTarget?,
+    resolver: PushTargetResolver,
+    navController: NavHostController,
+    snackbar: SnackbarHostState,
+    onConsumed: (PushTarget) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val messages =
+        mapOf(
+            PushTargetMissing.File to stringResource(R.string.push_target_missing_file),
+            PushTargetMissing.Note to stringResource(R.string.push_target_missing_note),
+            PushTargetMissing.Course to stringResource(R.string.push_target_missing_course),
+        )
+    LaunchedEffect(target) {
+        if (target == null) return@LaunchedEffect
+        val resolution = resolver.resolve(target)
+        // The nested graph is set during the first layout pass; wait for its start destination before navigating.
+        navController.currentBackStackEntryFlow.first()
+        navController.openPushTarget(resolution.target)
+        // Outlives this effect, which restarts (and is cancelled) once the target is consumed.
+        resolution.missing?.let { missing -> scope.launch { snackbar.showSnackbar(messages.getValue(missing)) } }
+        onConsumed(target)
+    }
+}
+
+/** Resets the shell to Courses, then pushes the target's course and file / note so back walks out the same way. */
+private fun NavHostController.openPushTarget(target: PushTarget) {
+    val stack = target.backStack()
+    navigate(stack.first()) { popUpTo(graph.id) { inclusive = true } }
+    stack.drop(1).forEach { navigate(it) }
 }
 
 /** Switches tab keeping each tab's back stack and state; Courses stays at the bottom so back returns to it. */
