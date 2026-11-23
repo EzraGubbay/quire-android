@@ -137,6 +137,11 @@ future Compose LaTeX lib) without touching the tag contract or the rest of the r
 - Streaming chat answers (E6) re-render on each chunk (debounced), not incrementally. Revisit only if
   profiling on a real device shows jank on long streamed answers.
 - Markwon is dormant; the block-segmentation seam is the exit if it ever needs replacing.
+- Markwon's ext-latex only knows `$$…$$` (inline inside a line, block on its own lines); the server writes `$…$`
+  inline and the model sometimes `\(…\)` / `\[…\]`. `mathMarkdownBlocks` (`feature/notes/MathDelimiters.kt`) ports the
+  web app's display-math normalisation and rewrites inline `$…$` / `\(…\)` to `$$…$$` before rendering, outside code.
+- JLaTeXMath resolves many built-in macros (`\dfrac`, `cases`, `pmatrix`, …) by class/method name, so
+  `proguard-rules.pro` keeps `org.scilab.forge.jlatexmath.**` whole; without it those formulas fail in release builds.
 
 ## Follow-ups to unblock #42 (notes reader, E5-S6) and E6 (chat answers)
 

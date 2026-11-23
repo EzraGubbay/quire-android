@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,8 +57,8 @@ import com.ezragubbay.quire.core.designsystem.component.ErrorState
 import com.ezragubbay.quire.core.network.CitationDto
 import com.ezragubbay.quire.feature.notes.BlockView
 import com.ezragubbay.quire.feature.notes.NoteBlock
+import com.ezragubbay.quire.feature.notes.mathMarkdownBlocks
 import com.ezragubbay.quire.feature.notes.rememberMarkwon
-import com.ezragubbay.quire.feature.notes.segmentMarkdown
 import kotlinx.coroutines.launch
 
 const val CONVERSATION_TAG = "screen-conversation"
@@ -188,11 +188,11 @@ private fun MessageList(
         }
         if (!atBottom && bubbles.isNotEmpty()) {
             val scope = rememberCoroutineScope()
-            AssistChip(
+            // A filled (primary/onPrimary) button: opaque, so it stays legible over the messages behind it.
+            Button(
                 onClick = { scope.launch { listState.animateScrollToItem(bubbles.lastIndex) } },
-                label = { Text(stringResource(R.string.conversation_jump_latest)) },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).testTag("action-jump-latest"),
-            )
+            ) { Text(stringResource(R.string.conversation_jump_latest)) }
         }
     }
 }
@@ -294,7 +294,7 @@ private fun AnswerBody(
     settled: Boolean,
 ) {
     val markwon = rememberMarkwon()
-    val blocks = remember(markdown) { segmentMarkdown(markdown) }
+    val blocks = remember(markdown) { mathMarkdownBlocks(markdown) }
     // `answer-markdown` is the SETTLED-answer contract node (docs/e2e/E6-chat.md): tag it only once the
     // stream has settled, so a test awaiting it does not race mid-stream deltas — the block-math node and
     // the citations arrive on the last delta / `done`. The body still renders incrementally while streaming.

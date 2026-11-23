@@ -49,7 +49,7 @@ class NoteReaderViewModel
                 _state.value =
                     when (val result = api.note(route.courseSlug, route.noteId)) {
                         is ApiResult.Success ->
-                            NoteReaderUiState.Ready(result.value.title, segmentMarkdown(result.value.markdown))
+                            NoteReaderUiState.Ready(result.value.title, mathMarkdownBlocks(result.value.markdown))
                         is ApiResult.Failure -> NoteReaderUiState.Error
                     }
             }
