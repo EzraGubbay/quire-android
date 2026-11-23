@@ -1,5 +1,6 @@
 package com.ezragubbay.quire.push
 
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.ezragubbay.quire.core.network.FakeServerConfig
 import com.ezragubbay.quire.core.network.FakeTokenProvider
 import com.ezragubbay.quire.core.network.NetworkOptions
@@ -12,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -29,11 +31,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.util.concurrent.TimeUnit
 
 class PushRegistrarTest {
     @get:Rule
     val logs = PushLogRule()
+
+    @get:Rule
+    val tmp = TemporaryFolder()
 
     private lateinit var server: MockWebServer
     private lateinit var client: PushClient
@@ -269,19 +275,82 @@ class PushRegistrarTest {
         }
 
     @Test
-    fun sendTest_unregistered_deleteFails_neverResendsTheDeadToken() =
+    fun sendTest_unregistered_deleteFails_workerRetriesNeverPutTheDeadToken() =
         runBlocking {
             server.enqueue(jsonResponse("""{"eventId":"e1","outcome":"unregistered"}"""))
-            val tokens =
-                object : FcmTokenSource by FakeTokenSource(tokens = listOf("dead-token")) {
-                    override suspend fun delete() = error("offline")
-                }
+            val tokens = FakeTokenSource(tokens = listOf("dead-token", "fresh-token")).apply { failDelete = true }
+            val registrar = registrar(tokens)
 
-            assertEquals(TestPushResult.Unregistered, registrar(tokens).sendTest())
-
-            take()
-            assertNull(server.takeRequest(300, TimeUnit.MILLISECONDS))
+            // The delete fails: nothing is registered, the retry worker is queued.
+            assertEquals(TestPushResult.Unregistered, registrar.sendTest())
+            assertEquals("/api/mobile/v1/push/test", take().path)
             assertEquals(1, retry.enqueued)
+
+            // The worker's plain sync() while FCM is still unreachable: still no PUT, still a retry.
+            assertEquals(RegistrationOutcome.Retry, registrar.sync())
+            assertNull(server.takeRequest(300, TimeUnit.MILLISECONDS))
+
+            // Next worker run with FCM back: delete first, then a fresh token is registered.
+            tokens.failDelete = false
+            server.enqueue(fixtureResponse("putPushRegistration.200.json"))
+            assertEquals(RegistrationOutcome.Registered, registrar.sync())
+            assertEquals(JsonPrimitive("fresh-token"), take().json()["fcmToken"])
+            assertEquals(listOf("fresh-token"), tokens.issued)
+
+            // The stale mark is cleared: a later sync PUTs the same fresh token without another delete.
+            server.enqueue(fixtureResponse("putPushRegistration.200.json"))
+            tokens.calls.clear()
+            assertEquals(RegistrationOutcome.Registered, registrar.sync())
+            assertEquals(JsonPrimitive("fresh-token"), take().json()["fcmToken"])
+            assertFalse(tokens.calls.contains("delete"))
+        }
+
+    @Test
+    fun staleMark_isPersisted_soANewProcessDeletesBeforeRegistering() =
+        runBlocking {
+            val store =
+                PreferenceDataStoreFactory.create(scope = scope) {
+                    tmp.newFile("push.preferences_pb").also { it.delete() }
+                }
+            DataStoreStaleTokenFlag(store).set(true)
+            // A fresh registrar (as after a process restart) over the same DataStore.
+            val tokens = FakeTokenSource(tokens = listOf("dead-token", "fresh-token"))
+            val registrar =
+                PushRegistrar(
+                    tokens = tokens,
+                    client = client,
+                    device = PushDevice("1.1.0", DataStoreStaleTokenFlag(store)) { true },
+                    categories = PushCategoryPolicy({ true }),
+                    retry = retry,
+                    scope = scope,
+                )
+            server.enqueue(fixtureResponse("putPushRegistration.200.json"))
+
+            assertEquals(RegistrationOutcome.Registered, registrar.sync())
+
+            assertEquals(JsonPrimitive("fresh-token"), take().json()["fcmToken"])
+            assertEquals("delete", tokens.calls.first())
+            assertFalse(DataStoreStaleTokenFlag(store).isSet())
+        }
+
+    @Test
+    fun clearLocal_waitsForAnInFlightSync() =
+        runBlocking {
+            // The PUT is held open; sign-out's local half must not interleave with it.
+            server.enqueue(fixtureResponse("putPushRegistration.200.json").setBodyDelay(500, TimeUnit.MILLISECONDS))
+            val tokens = FakeTokenSource()
+            val registrar = registrar(tokens)
+
+            val syncing = scope.launch { registrar.sync() }
+            take()
+            val clearing = scope.launch { registrar.clearLocal() }
+            Thread.sleep(200)
+            // Still waiting for the registration to finish: the token is untouched.
+            assertFalse(tokens.calls.contains("delete"))
+            syncing.join()
+            clearing.join()
+
+            assertEquals(listOf("autoInit=true", "token", "delete", "autoInit=false"), tokens.calls)
         }
 
     @Test

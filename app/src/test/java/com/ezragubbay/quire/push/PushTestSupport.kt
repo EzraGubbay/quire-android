@@ -82,11 +82,18 @@ class FakeTokenSource(
     override suspend fun token(): String? {
         calls += "token"
         if (failToken) error("SERVICE_NOT_AVAILABLE")
-        return tokens.getOrNull(index)
+        return tokens.getOrNull(index)?.also { issued += it }
     }
+
+    /** While true, [delete] fails (offline / Play services unavailable) and the current token stays. */
+    var failDelete: Boolean = false
+
+    /** Every token this source handed out, in order. */
+    val issued = mutableListOf<String>()
 
     override suspend fun delete() {
         calls += "delete"
+        if (failDelete) error("SERVICE_NOT_AVAILABLE")
         index++
     }
 

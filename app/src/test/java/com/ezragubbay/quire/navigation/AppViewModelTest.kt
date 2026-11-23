@@ -16,6 +16,7 @@ import com.ezragubbay.quire.push.PushSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -343,6 +344,39 @@ class AppViewModelTest {
 
             assertEquals(listOf("push.unregister", "revoke", "push.signedOut"), order)
         }
+
+    @Test
+    fun signOut_hungPushDelete_stillLeavesTheRevokeItsBudget() {
+        val dispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        val testScope = CoroutineScope(dispatcher)
+        try {
+            runTest(dispatcher) {
+                val sessions = sessionsOn(testScope, "hung-push-delete")
+                sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
+                advanceUntilIdle()
+                val hung =
+                    object : PushSession by push {
+                        override suspend fun unregisterRemote() {
+                            order += "push.unregister"
+                            awaitCancellation()
+                        }
+                    }
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), hung)
+                advanceUntilIdle()
+
+                vm.signOut()
+                advanceUntilIdle()
+
+                // The push delete is cut off at its own timeout; the revoke still goes out.
+                assertEquals(listOf("push.unregister", "revoke", "push.signedOut"), order)
+                assertEquals(1, api.revokeCalls)
+                assertEquals(false, vm.signedIn.value)
+            }
+        } finally {
+            testScope.cancel()
+        }
+    }
 
     @Test
     fun pairing_registersForPush() =

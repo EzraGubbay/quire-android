@@ -23,7 +23,8 @@ class QuireApplication :
     override fun onCreate() {
         super.onCreate()
         // Push channels exist from the first launch, so their system settings can be opened before any push arrives.
-        PushChannels.ensure(this)
+        // A build without google-services.json can never receive a push, so it shows no empty push channels.
+        if (BuildConfig.PUSH_CONFIGURED) PushChannels.ensure(this)
     }
 
     override val workManagerConfiguration: Configuration

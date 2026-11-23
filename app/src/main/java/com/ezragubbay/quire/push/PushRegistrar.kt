@@ -36,9 +36,32 @@ enum class RegistrationOutcome {
     Failed,
 }
 
-/** What the registration says about this app install: its version, and whether a session exists. */
+/**
+ * A persisted "the current FCM token is dead" mark. It is set when the server reports `unregistered`, and cleared only
+ * once the token was deleted at FCM, so no later sync (in this process or after a restart) can PUT the dead token.
+ */
+interface StaleTokenFlag {
+    suspend fun isSet(): Boolean
+
+    suspend fun set(stale: Boolean)
+}
+
+/** Process-local [StaleTokenFlag] (tests; the app persists it in DataStore). */
+class InMemoryStaleTokenFlag : StaleTokenFlag {
+    @Volatile
+    private var stale = false
+
+    override suspend fun isSet() = stale
+
+    override suspend fun set(stale: Boolean) {
+        this.stale = stale
+    }
+}
+
+/** This app install as the registration sees it: its version, whether a session exists, its stale-token mark. */
 class PushDevice(
     val appVersion: String,
+    val staleToken: StaleTokenFlag = InMemoryStaleTokenFlag(),
     val isSignedIn: suspend () -> Boolean,
 )
 
@@ -64,10 +87,17 @@ class PushRegistrar
         @Volatile
         private var lastCategories: List<PushCategory>? = null
 
-        /** Registers this device's current token and categories. Idempotent; serialised. */
+        /**
+         * Registers this device's current token and categories. Idempotent; serialised. While the token is marked
+         * stale it is deleted first, and nothing is sent until that delete succeeds.
+         */
         suspend fun sync(): RegistrationOutcome =
             mutex.withLock {
                 if (!tokens.available || !device.isSignedIn()) return@withLock RegistrationOutcome.Skipped
+                if (device.staleToken.isSet()) {
+                    if (!deleteToken()) return@withLock RegistrationOutcome.Retry
+                    device.staleToken.set(false)
+                }
                 tokens.setAutoInitEnabled(true)
                 val token = firebaseCall("token") { tokens.token() } ?: return@withLock RegistrationOutcome.Retry
                 val wanted = categories.current()
@@ -126,24 +156,30 @@ class PushRegistrar
             scope.launch { clearLocal() }
         }
 
-        /** The local half of sign-out: invalidate the token at FCM, then disable auto-init. */
+        /**
+         * The local half of sign-out: invalidate the token at FCM, then disable auto-init. Serialised with [sync], so
+         * an in-flight registration cannot re-enable auto-init after it.
+         */
         suspend fun clearLocal() {
             if (!tokens.available) return
-            deleteToken()
-            tokens.setAutoInitEnabled(false)
+            mutex.withLock {
+                deleteToken()
+                tokens.setAutoInitEnabled(false)
+            }
         }
 
         /**
          * Sends `POST /push/test` (the Settings control is QMOB-E8-S5). On `outcome: unregistered` the server
-         * already dropped the registration because FCM rejected the token, so the dead token is deleted first and a
-         * fresh one is fetched and registered: the dead token is never sent again.
+         * already dropped the registration because FCM rejected the token. The token is marked stale (persisted), so
+         * this and every later [sync] deletes it at FCM before fetching a fresh one: the dead token is never sent
+         * again, even when the delete has to wait for the retry worker.
          */
         suspend fun sendTest(): TestPushResult {
             if (!tokens.available) return TestPushResult.NotConfigured
             val result = client.sendTest()
             if (result == TestPushResult.Unregistered) {
-                // Without a successful delete the next token() could hand back the dead token: leave it to the worker.
-                if (!deleteToken() || sync() == RegistrationOutcome.Retry) retry.enqueue()
+                device.staleToken.set(true)
+                if (sync() == RegistrationOutcome.Retry) retry.enqueue()
             }
             return result
         }

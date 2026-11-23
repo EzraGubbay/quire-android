@@ -20,6 +20,9 @@ import javax.inject.Inject
 
 private const val REVOKE_TIMEOUT_MS = 5_000L
 
+/** The push-registration delete's own share of [REVOKE_TIMEOUT_MS], so the token revoke always gets the rest. */
+private const val PUSH_DELETE_TIMEOUT_MS = 2_000L
+
 /**
  * Root routing state and session lifecycle. [signedIn] is `null` until the persisted session is read (the splash
  * waits), then signed-in or not. The session ends three ways: a `401` anywhere ([SessionEvents.expired]), a `401`
@@ -85,7 +88,7 @@ class AppViewModel
                 try {
                     validation?.cancel()
                     withTimeoutOrNull(REVOKE_TIMEOUT_MS) {
-                        push.unregisterRemote()
+                        withTimeoutOrNull(PUSH_DELETE_TIMEOUT_MS) { push.unregisterRemote() }
                         client.revokeToken()
                     }
                     sessions.signOut()

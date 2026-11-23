@@ -33,7 +33,8 @@ class SystemPushNotifier(
 ) : PushNotifier {
     override fun post(spec: PushNotificationSpec): Boolean {
         if (!notificationsAllowed(context)) return false
-        // Channels are created at app start; ensure again in case the process was started by FCM alone.
+        // Idempotent. QuireApplication creates the channels at start only when push is configured; posting must not
+        // depend on that (instrumented tests run under the Hilt test application, which never creates them).
         PushChannels.ensure(context)
         val intent =
             Intent(context, MainActivity::class.java)

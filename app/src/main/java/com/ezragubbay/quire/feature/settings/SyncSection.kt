@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,7 +29,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.designsystem.component.SectionHeader
+import com.ezragubbay.quire.push.NotificationPromptStore
 import com.ezragubbay.quire.sync.SyncInterval
+import kotlinx.coroutines.launch
 
 /** Settings → Sync: background-sync switch, interval, Wi-Fi only, last success and 'Sync now'. */
 @Composable
@@ -39,6 +42,10 @@ internal fun SyncSection(sync: SyncActions) {
     val offline = sync.state.offline
     // Turning the summary notification on asks for the notification permission (Android 13+); denial keeps it silent.
     val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    // Shared with the push permission card: once asked here, the card knows a later denial may be a blocked dialog.
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val markRequested: () -> Unit = { scope.launch { NotificationPromptStore(context).markRequested() } }
     Column {
         SectionHeader(stringResource(R.string.settings_sync))
         ListItem(
@@ -99,6 +106,7 @@ internal fun SyncSection(sync: SyncActions) {
                         onValueChange = {
                             sync.offline.onNotifyChanged(it)
                             if (it && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                markRequested()
                                 askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }
                         },

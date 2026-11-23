@@ -23,6 +23,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,9 +77,24 @@ class NotificationPromptViewModel
     }
 
 /**
+ * Whether a denied `POST_NOTIFICATIONS` request was answered by the system without showing its dialog (the user
+ * denied it before, so Android stopped asking). Then the only way left is the app's notification settings.
+ *
+ * The rationale flag is true only between a first denial and a permanent one, so a dialog that really showed leaves
+ * it true either before or after the request. It is false both times either when Android no longer asks, or on a
+ * first-ever request the user dismissed without choosing; [requestedBefore] tells those two apart.
+ */
+fun permissionDialogWasBlocked(
+    granted: Boolean,
+    requestedBefore: Boolean,
+    rationaleBefore: Boolean,
+    rationaleAfter: Boolean,
+): Boolean = !granted && requestedBefore && !rationaleBefore && !rationaleAfter
+
+/**
  * "Get notified about new course files and homework deadlines" — Allow / Not now. Shown on Courses once, after the
- * first pairing, on Android 13+ while the permission is not granted. Never at launch. When the system will no longer
- * show its dialog, Allow opens the app's notification settings instead.
+ * first pairing, on Android 13+ while the permission is not granted. Never at launch. Allow asks the system; when the
+ * system no longer shows its dialog ([permissionDialogWasBlocked]), it opens the app's notification settings.
  */
 @Composable
 fun NotificationPermissionCard(viewModel: NotificationPromptViewModel = hiltViewModel()) {
@@ -88,30 +106,38 @@ fun NotificationPermissionCard(viewModel: NotificationPromptViewModel = hiltView
             PackageManager.PERMISSION_GRANTED
     // Already allowed (for example from the Sync settings): nothing to ask, so retire the card silently.
     LaunchedEffect(prompt.pending, granted) { if (prompt.pending && granted) viewModel.onAnswered() }
+    // Captured when Allow is tapped, read in the result: survives a configuration change while the dialog is up.
+    var requestedBefore by rememberSaveable { mutableStateOf(false) }
+    var rationaleBefore by rememberSaveable { mutableStateOf(false) }
     val request =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.onAnswered() }
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+            val blocked =
+                permissionDialogWasBlocked(
+                    granted = allowed,
+                    requestedBefore = requestedBefore,
+                    rationaleBefore = rationaleBefore,
+                    rationaleAfter = context.showsNotificationRationale(),
+                )
+            if (blocked) context.startActivity(appNotificationSettings(context))
+            viewModel.onAnswered()
+        }
     if (!prompt.pending || granted) return
     PermissionCard(
         onAllow = {
-            val activity = context.findActivity()
-            val dialogBlocked =
-                prompt.requestedBefore &&
-                    activity != null &&
-                    !ActivityCompat.shouldShowRequestPermissionRationale(
-                        activity,
-                        Manifest.permission.POST_NOTIFICATIONS,
-                    )
-            if (dialogBlocked) {
-                context.startActivity(appNotificationSettings(context))
-                viewModel.onAnswered()
-            } else {
-                viewModel.onRequesting()
-                request.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+            requestedBefore = prompt.requestedBefore
+            rationaleBefore = context.showsNotificationRationale()
+            viewModel.onRequesting()
+            request.launch(Manifest.permission.POST_NOTIFICATIONS)
         },
         onNotNow = viewModel::onAnswered,
     )
 }
+
+private fun Context.showsNotificationRationale(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        findActivity()?.let {
+            ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS)
+        } == true
 
 @Composable
 private fun PermissionCard(

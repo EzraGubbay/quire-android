@@ -4,6 +4,7 @@ import android.content.Context
 import com.ezragubbay.quire.BuildConfig
 import com.ezragubbay.quire.core.data.session.SessionRepository
 import com.ezragubbay.quire.core.data.session.SessionState
+import com.ezragubbay.quire.core.data.settings.settingsDataStore
 import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.network.NetworkOptions
 import com.ezragubbay.quire.core.network.QuireClient
@@ -14,6 +15,7 @@ import com.ezragubbay.quire.core.network.TokenCache
 import com.ezragubbay.quire.push.AllCategoriesOn
 import com.ezragubbay.quire.push.AppPushSession
 import com.ezragubbay.quire.push.CachedPushNamesLookup
+import com.ezragubbay.quire.push.DataStoreStaleTokenFlag
 import com.ezragubbay.quire.push.FcmTokenSource
 import com.ezragubbay.quire.push.FirebaseTokenSource
 import com.ezragubbay.quire.push.NoopTokenSource
@@ -100,8 +102,12 @@ object PushModule {
     ) = PushCategoryPolicy({ notificationsAllowed(context) }, preferences)
 
     @Provides
-    fun pushDevice(sessions: SessionRepository) =
-        PushDevice(BuildConfig.VERSION_NAME) { sessions.current() is SessionState.SignedIn }
+    fun pushDevice(
+        @ApplicationContext context: Context,
+        sessions: SessionRepository,
+    ) = PushDevice(BuildConfig.VERSION_NAME, DataStoreStaleTokenFlag(context.settingsDataStore)) {
+        sessions.current() is SessionState.SignedIn
+    }
 
     @Provides
     @Singleton
