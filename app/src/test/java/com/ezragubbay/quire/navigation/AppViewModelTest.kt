@@ -13,6 +13,7 @@ import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
 import com.ezragubbay.quire.push.PushSession
+import com.ezragubbay.quire.push.PushTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,6 +21,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -401,5 +404,124 @@ class AppViewModelTest {
             vm.signedIn.first { it == false }
 
             assertEquals(listOf("push.signedOut"), order)
+        }
+
+    // --- Push deep links (QMOB-E8-S4): the pending target ------------------------------------------
+
+    /** Runs [block] with Main and the session store on one [StandardTestDispatcher], so the launch read waits. */
+    private fun withPausedLaunch(block: suspend TestScope.(CoroutineScope) -> Unit) {
+        val dispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        val testScope = CoroutineScope(dispatcher)
+        try {
+            runTest(dispatcher) { block(testScope) }
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun pushTarget_whenSignedIn_isPendingUntilConsumed_once() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            val target = PushTarget.File("signals-and-systems", "f1")
+
+            vm.openFromPush(target)
+            assertEquals(target, vm.pendingPushTarget.value)
+
+            vm.onPushTargetConsumed(target)
+            assertNull(vm.pendingPushTarget.value)
+            vm.onPushTargetConsumed(target)
+            assertNull(vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun pushTarget_newerTapReplacesAnUnconsumedOne_andAStaleConsumeKeepsIt() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            val first = PushTarget.Course("a")
+            val second = PushTarget.Note("b", "n1")
+
+            vm.openFromPush(first)
+            vm.openFromPush(second)
+            vm.onPushTargetConsumed(first)
+
+            assertEquals(second, vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun pushTarget_isHeldWhileTheSessionIsRestored_thenKeptWhenSignedIn() =
+        withPausedLaunch { scope ->
+            val sessions = sessionsOn(scope, "held-signed-in")
+            sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
+            advanceUntilIdle()
+            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push)
+            val target = PushTarget.Note("signals-and-systems", "n1")
+
+            assertNull(vm.signedIn.value)
+            vm.openFromPush(target)
+            assertEquals(target, vm.pendingPushTarget.value)
+
+            advanceUntilIdle()
+            assertEquals(true, vm.signedIn.value)
+            assertEquals(target, vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun pushTarget_heldWhileRestoring_isDroppedWhenSignedOut() =
+        withPausedLaunch { scope ->
+            val sessions = sessionsOn(scope, "held-signed-out")
+            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push)
+
+            assertNull(vm.signedIn.value)
+            vm.openFromPush(PushTarget.Course("signals-and-systems"))
+
+            advanceUntilIdle()
+            assertEquals(false, vm.signedIn.value)
+            assertNull(vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun pushTarget_whileSignedOut_isDropped() =
+        runBlocking {
+            val vm = vm()
+            assertFalse(vm.resolved())
+
+            vm.openFromPush(PushTarget.Course("signals-and-systems"))
+
+            assertNull(vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun pushTarget_unconsumed_isDroppedOnSignOut() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+            vm.openFromPush(PushTarget.Course("signals-and-systems"))
+
+            vm.signOut().join()
+
+            assertNull(vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun pushTarget_unconsumed_isDroppedOnSessionExpiry() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+            vm.openFromPush(PushTarget.Course("signals-and-systems"))
+
+            events.emitExpired()
+            vm.signedIn.first { it == false }
+
+            assertNull(vm.pendingPushTarget.value)
         }
 }

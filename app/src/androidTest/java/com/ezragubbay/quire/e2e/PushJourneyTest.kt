@@ -207,7 +207,7 @@ class PushJourneyTest {
 
     // --- Deep links: un-ignored by QMOB-E8-S4 (#64) -------------------------------------------------
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun filesAdded_single_tapOpensViewer_backReturnsToCourse() {
         seedSignedIn()
@@ -220,7 +220,7 @@ class PushJourneyTest {
         awaitTag("screen-course")
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun filesAdded_many_tapOpensCourse() {
         seedSignedIn()
@@ -232,7 +232,7 @@ class PushJourneyTest {
         composeRule.onNodeWithTag("screen-pdf-viewer").assertDoesNotExist()
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun homeworkDue_tapOpensSheet() {
         seedSignedIn()
@@ -243,7 +243,7 @@ class PushJourneyTest {
         awaitTag("screen-pdf-viewer")
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun noteSynthesized_ready_tapOpensNoteReader() {
         seedSignedIn()
@@ -254,7 +254,7 @@ class PushJourneyTest {
         awaitTag("screen-note-reader")
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun deletedFile_tapFallsBackToCourseWithMessage() {
         seedSignedIn()
@@ -405,6 +405,7 @@ class PushJourneyTest {
                         "GET /courses/signals-and-systems/sessions" -> json("course-sessions.json")
                         "GET /courses/signals-and-systems/files" -> json("course-files.json")
                         "GET /courses/signals-and-systems/notes" -> json("course-notes.json")
+                        "GET /courses/signals-and-systems/files/$PUSH_FILE_ID" -> json("push-file.json")
                         "GET /courses/signals-and-systems/notes/$PUSH_NOTE_ID" -> json("reader-note.json")
                         else -> json("error-not-found.json", 404)
                     }
