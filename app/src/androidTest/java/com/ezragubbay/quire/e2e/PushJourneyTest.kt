@@ -1,10 +1,13 @@
 package com.ezragubbay.quire.e2e
 
 import android.Manifest
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
 import android.os.SystemClock
 import android.service.notification.StatusBarNotification
 import androidx.compose.ui.semantics.SemanticsActions
@@ -23,6 +26,8 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.core.data.session.SessionRepository
 import com.ezragubbay.quire.core.network.TokenCache
@@ -332,12 +337,40 @@ class PushJourneyTest {
         return pushNotifications().first { it.tag == tag }
     }
 
-    /** Opens the notification tagged [tag] the way a tap does. */
+    /**
+     * Opens the notification tagged [tag] the way a tap does, then waits for `MainActivity` to be resumed (the tap
+     * cold-starts it; until it is, there is no compose hierarchy to query). System UI sends a real tap with its own
+     * background-start privilege; this test is the sender here, so it opts in to the same for the send.
+     */
     private fun tap(tag: String) {
         val notification = awaitNotification(tag).notification
         assertNotNull(notification.contentIntent)
-        notification.contentIntent.send()
+        notification.contentIntent.send(context, 0, null, null, null, null, tapOptions())
+        awaitCondition { mainActivityResumed() }
         composeRule.waitForIdle()
+    }
+
+    private fun tapOptions(): Bundle? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            @Suppress("DEPRECATION") // MODE_..._ALLOW_ALWAYS replaces it on API 36; the CI emulator is API 34.
+            ActivityOptions
+                .makeBasic()
+                .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                .toBundle()
+        } else {
+            null
+        }
+
+    private fun mainActivityResumed(): Boolean {
+        var resumed = false
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            resumed =
+                ActivityLifecycleMonitorRegistry
+                    .getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)
+                    .any { it is MainActivity }
+        }
+        return resumed
     }
 
     private fun launch() {
