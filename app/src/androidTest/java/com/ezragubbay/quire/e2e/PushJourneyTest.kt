@@ -129,7 +129,7 @@ class PushJourneyTest {
 
     // --- Registration and receiving: un-ignored by QMOB-E8-S3 (#63) -------------------------------
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S3 (#63)
+    // un-ignored by QMOB-E8-S3 (#63)
     @Test
     fun registration_afterPairing_putsTokenAndCategories() {
         seedSignedOut()
@@ -146,7 +146,7 @@ class PushJourneyTest {
         assertEquals("Bearer $PAIRED_TOKEN", put.getHeader("Authorization"))
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S3 (#63)
+    // un-ignored by QMOB-E8-S3 (#63)
     @Test
     fun filesAdded_single_postsNotificationOnFilesChannel() {
         seedSignedIn()
@@ -165,7 +165,7 @@ class PushJourneyTest {
         )
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S3 (#63)
+    // un-ignored by QMOB-E8-S3 (#63)
     @Test
     fun unknownType_postsNothing() {
         seedSignedIn()
@@ -177,7 +177,7 @@ class PushJourneyTest {
         assertTrue(pushNotifications().isEmpty())
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S3 (#63)
+    // un-ignored by QMOB-E8-S3 (#63)
     @Test
     fun signOut_deletesRegistrationThenRevokes() {
         seedSignedIn()
