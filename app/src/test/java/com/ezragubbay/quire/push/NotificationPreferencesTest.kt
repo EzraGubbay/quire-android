@@ -5,7 +5,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -25,8 +27,12 @@ class NotificationPreferencesTest {
     @After
     fun tearDown() = scopes.forEach { it.cancel() }
 
-    /** A store over [file]; a second call opens the same file as a fresh process would. */
-    private fun store(): NotificationPreferencesStore {
+    /**
+     * A store over [file]. A second call closes the earlier stores first (DataStore allows one active instance per
+     * file), then opens the same file as a fresh process would.
+     */
+    private suspend fun store(): NotificationPreferencesStore {
+        scopes.forEach { it.coroutineContext.job.cancelAndJoin() }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also { scopes += it }
         return NotificationPreferencesStore(PreferenceDataStoreFactory.create(scope = scope) { file })
     }

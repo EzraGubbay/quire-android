@@ -12,16 +12,18 @@ import com.ezragubbay.quire.core.network.QuireClientFactory
 import com.ezragubbay.quire.core.network.ServerConfigProvider
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
-import com.ezragubbay.quire.push.AllCategoriesOn
+import com.ezragubbay.quire.push.AndroidSystemNotificationState
 import com.ezragubbay.quire.push.AppPushSession
 import com.ezragubbay.quire.push.CachedPushNamesLookup
 import com.ezragubbay.quire.push.DataStoreStaleTokenFlag
 import com.ezragubbay.quire.push.FcmTokenSource
 import com.ezragubbay.quire.push.FirebaseTokenSource
 import com.ezragubbay.quire.push.NoopTokenSource
+import com.ezragubbay.quire.push.NotificationPreferencesStore
 import com.ezragubbay.quire.push.NotificationPromptStore
 import com.ezragubbay.quire.push.PushCategoryPolicy
 import com.ezragubbay.quire.push.PushClient
+import com.ezragubbay.quire.push.PushControls
 import com.ezragubbay.quire.push.PushDevice
 import com.ezragubbay.quire.push.PushMessageHandler
 import com.ezragubbay.quire.push.PushNamesLookup
@@ -32,7 +34,9 @@ import com.ezragubbay.quire.push.PushRegistrationScheduler
 import com.ezragubbay.quire.push.PushRegistrationWorkerFactory
 import com.ezragubbay.quire.push.PushSession
 import com.ezragubbay.quire.push.PushSyncTrigger
+import com.ezragubbay.quire.push.RegistrarPushControls
 import com.ezragubbay.quire.push.ResourcePushTexts
+import com.ezragubbay.quire.push.SystemNotificationStateReader
 import com.ezragubbay.quire.push.SystemPushNotifier
 import com.ezragubbay.quire.push.WorkManagerPushRegistrationScheduler
 import com.ezragubbay.quire.push.WorkManagerPushSyncTrigger
@@ -84,10 +88,6 @@ object PushModule {
                 ),
             ),
         )
-
-    /** The in-app category switches; QMOB-E8-S5 (#65) replaces this with the DataStore-backed toggles. */
-    @Provides
-    fun pushPreferences(): PushPreferences = AllCategoriesOn
 
     @Provides
     @Singleton
@@ -152,4 +152,21 @@ object PushModule {
         notifier = SystemPushNotifier(context),
         sync = sync,
     )
+}
+
+/** Settings → Notifications (QMOB-E8-S5): the category switches, the registrar controls and the system state. */
+@Module
+@InstallIn(SingletonComponent::class)
+object PushPreferencesModule {
+    /** The in-app category switches, stored in the settings DataStore; the registrar and the handler read them. */
+    @Provides
+    fun pushPreferences(store: NotificationPreferencesStore): PushPreferences = store
+
+    @Provides
+    fun pushControls(controls: RegistrarPushControls): PushControls = controls
+
+    @Provides
+    fun systemNotificationStateReader(
+        @ApplicationContext context: Context,
+    ): SystemNotificationStateReader = AndroidSystemNotificationState(context)
 }

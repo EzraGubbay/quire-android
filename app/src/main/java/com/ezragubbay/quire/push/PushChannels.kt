@@ -23,6 +23,14 @@ object PushChannels {
             is PushEvent.Test -> SYSTEM
         }
 
+    /** The channel a category's events post on (its system settings page). */
+    fun forCategory(category: PushCategory): String =
+        when (category) {
+            PushCategory.Files -> FILES
+            PushCategory.Deadlines -> DEADLINES
+            PushCategory.Notes -> NOTES
+        }
+
     /** Creates (or refreshes the names of) every push channel. Idempotent: the user's own channel settings are kept. */
     fun ensure(context: Context) {
         val channels =

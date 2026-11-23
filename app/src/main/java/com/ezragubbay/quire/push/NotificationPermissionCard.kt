@@ -169,12 +169,12 @@ private fun PermissionCard(
     }
 }
 
-private fun appNotificationSettings(context: Context): Intent =
+internal fun appNotificationSettings(context: Context): Intent =
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-private tailrec fun Context.findActivity(): Activity? =
+internal tailrec fun Context.findActivity(): Activity? =
     when (this) {
         is Activity -> this
         is ContextWrapper -> baseContext.findActivity()

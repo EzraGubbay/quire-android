@@ -64,8 +64,7 @@ class NotificationSettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() =
-        NotificationSettingsViewModel(preferences, push, { system }, prompt).also { viewModels += it }
+    private fun newVm() = NotificationSettingsViewModel(preferences, push, { system }, prompt).also { viewModels += it }
 
     @Test
     fun defaults_everyCategoryOn_idle() =
