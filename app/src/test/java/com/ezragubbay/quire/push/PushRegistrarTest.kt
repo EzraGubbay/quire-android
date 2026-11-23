@@ -70,22 +70,15 @@ class PushRegistrarTest {
         server.shutdown()
     }
 
-    private fun registrar(
-        tokens: FcmTokenSource = FakeTokenSource(),
-        preferences: PushPreferences = AllCategoriesOn,
-    ) = PushRegistrar(
-        tokens = tokens,
-        client = client,
-        device = PushDevice(appVersion = "1.1.0") { signedIn },
-        categories = PushCategoryPolicy({ allowed }, preferences),
-        retry = retry,
-        scope = scope,
-    )
-
-    private fun controls(
-        registrar: PushRegistrar,
-        tokens: FcmTokenSource = FakeTokenSource(),
-    ) = RegistrarPushControls(registrar, tokens, scope)
+    private fun registrar(tokens: FcmTokenSource = FakeTokenSource()) =
+        PushRegistrar(
+            tokens = tokens,
+            client = client,
+            device = PushDevice(appVersion = "1.1.0") { signedIn },
+            categories = PushCategoryPolicy({ allowed }),
+            retry = retry,
+            scope = scope,
+        )
 
     private fun take(): RecordedRequest = requireNotNull(server.takeRequest(5, TimeUnit.SECONDS)) { "no request" }
 
@@ -198,41 +191,6 @@ class PushRegistrarTest {
             while (retry.enqueued == 0 && System.currentTimeMillis() < deadline) Thread.sleep(10)
             assertEquals(1, retry.enqueued)
         }
-
-    @Test
-    fun onCategoriesChanged_debounces_toOnePutWithTheLatestCategories() =
-        runBlocking {
-            server.enqueue(fixtureResponse("putPushRegistration.200.json"))
-            val off = mutableSetOf<PushCategory>()
-            val controls = controls(registrar(preferences = PushPreferences { it !in off }))
-
-            // Three quick flips (a user toggling files off, on, off; then deadlines off) settle into one PUT.
-            off += PushCategory.Files
-            controls.onCategoriesChanged()
-            off -= PushCategory.Files
-            controls.onCategoriesChanged()
-            off += PushCategory.Files
-            off += PushCategory.Deadlines
-            controls.onCategoriesChanged()
-
-            val put = take()
-            assertEquals("PUT", put.method)
-            assertEquals(JsonArray(listOf(JsonPrimitive("notes"))), put.json()["categories"])
-            assertNull(server.takeRequest(RegistrarPushControls.CATEGORY_SYNC_DEBOUNCE_MS * 2, TimeUnit.MILLISECONDS))
-        }
-
-    @Test
-    fun onCategoriesChanged_notConfigured_sendsNothing() {
-        controls(registrar(NoopTokenSource), NoopTokenSource).onCategoriesChanged()
-
-        assertNull(server.takeRequest(RegistrarPushControls.CATEGORY_SYNC_DEBOUNCE_MS * 2, TimeUnit.MILLISECONDS))
-    }
-
-    @Test
-    fun available_followsTheTokenSource() {
-        assertTrue(controls(registrar()).available)
-        assertFalse(controls(registrar(NoopTokenSource), NoopTokenSource).available)
-    }
 
     @Test
     fun tokenUnavailable_isRetried_andNeverLogsTheMessage() =

@@ -231,6 +231,7 @@
     <string name="settings_push_notes_summary">When a study note is ready</string>
     <string name="settings_push_channel_blocked">Blocked in system settings</string>
     <string name="settings_push_channel_settings">%1$s: system settings</string>
+    <string name="settings_push_open_channel_settings">open system settings</string>
     <string name="settings_push_permission_missing">Notifications are off for Quire</string>
     <string name="settings_push_turn_on">Turn on</string>
     <string name="settings_push_app_blocked">Notifications are turned off for Quire in system settings</string>
@@ -239,7 +240,7 @@
     <string name="settings_push_send_test">Send test notification</string>
     <string name="settings_push_test_sending">Sending…</string>
     <string name="settings_push_test_sent">Sent</string>
-    <string name="settings_push_test_reregistering">Re-registering this device…</string>
+    <string name="settings_push_test_reregistered">This device was registered again. Send another test.</string>
     <string name="settings_push_test_try_later">Couldn\'t send, try again later</string>
     <string name="settings_push_test_server_not_set_up">Push is not set up on this server</string>
     <string name="settings_push_test_not_registered">This device isn\'t registered yet</string>

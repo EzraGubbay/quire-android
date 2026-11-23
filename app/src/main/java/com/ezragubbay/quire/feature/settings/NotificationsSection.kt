@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -100,7 +101,8 @@ private fun AvailableContent(
             state.system.permissionMissing ->
                 SystemStateRow(R.string.settings_push_permission_missing, R.string.settings_push_turn_on, askPermission)
         }
-        if (!state.system.appBlocked) {
+        // Until the stored switches are read, showing the defaults would flash "on" for a category that is off.
+        if (state.loaded && !state.system.appBlocked) {
             PushCategory.entries.forEach { category ->
                 CategoryRow(
                     category = category,
@@ -120,8 +122,8 @@ private fun AvailableContent(
 
 @Composable
 private fun SystemStateRow(
-    message: Int,
-    action: Int,
+    @StringRes message: Int,
+    @StringRes action: Int,
     onAction: () -> Unit,
 ) {
     ListItem(
@@ -172,7 +174,11 @@ private fun CategoryRow(
                 .testTag("setting-push-${category.wire}")
                 .then(
                     if (blocked) {
-                        Modifier.clickable(role = Role.Button, onClick = onOpenChannel)
+                        Modifier.clickable(
+                            role = Role.Button,
+                            onClickLabel = stringResource(R.string.settings_push_open_channel_settings),
+                            onClick = onOpenChannel,
+                        )
                     } else {
                         Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
                     },
@@ -186,31 +192,34 @@ private fun TestRows(
     onSendTest: () -> Unit,
 ) {
     ListItem(
-        headlineContent = {
-            Text(
-                stringResource(
-                    if (state.sending) R.string.settings_push_test_sending else R.string.settings_push_send_test,
-                ),
-            )
-        },
+        headlineContent = { Text(stringResource(R.string.settings_push_send_test)) },
         modifier =
             Modifier
                 .testTag("action-send-test-notification")
                 .clickable(enabled = !state.sending, role = Role.Button, onClick = onSendTest),
     )
-    val message = state.testMessage ?: return
+    // Mounted from the first tap on, showing "Sending…" and then the outcome: the live region already exists when
+    // its text changes, so TalkBack announces the outcome.
+    val text =
+        when {
+            state.sending -> R.string.settings_push_test_sending
+            state.testMessage != null -> testMessageText(state.testMessage)
+            else -> return
+        }
     ListItem(
         headlineContent = {
             Text(
-                stringResource(testMessageText(message)),
+                stringResource(text),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         },
-        modifier = Modifier.testTag("push-test-result").semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = Modifier.testTag("push-test-result"),
     )
 }
 
+@StringRes
 private fun categoryLabel(category: PushCategory): Int =
     when (category) {
         PushCategory.Files -> R.string.push_channel_files
@@ -218,6 +227,7 @@ private fun categoryLabel(category: PushCategory): Int =
         PushCategory.Notes -> R.string.push_channel_notes
     }
 
+@StringRes
 private fun categorySummary(category: PushCategory): Int =
     when (category) {
         PushCategory.Files -> R.string.settings_push_files_summary
@@ -225,10 +235,11 @@ private fun categorySummary(category: PushCategory): Int =
         PushCategory.Notes -> R.string.settings_push_notes_summary
     }
 
+@StringRes
 private fun testMessageText(message: TestPushMessage): Int =
     when (message) {
         TestPushMessage.Sent -> R.string.settings_push_test_sent
-        TestPushMessage.Reregistering -> R.string.settings_push_test_reregistering
+        TestPushMessage.Reregistered -> R.string.settings_push_test_reregistered
         TestPushMessage.TryLater -> R.string.settings_push_test_try_later
         TestPushMessage.ServerNotSetUp -> R.string.settings_push_test_server_not_set_up
         TestPushMessage.NotRegistered -> R.string.settings_push_test_not_registered

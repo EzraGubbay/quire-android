@@ -25,8 +25,11 @@ enum class TestPushMessage {
     /** 200 `outcome: sent`. */
     Sent,
 
-    /** 200 `outcome: unregistered`: the registrar deletes the dead token and registers a fresh one. */
-    Reregistering,
+    /**
+     * 200 `outcome: unregistered`. By the time the result shows, the registrar has deleted the dead token and
+     * registered a fresh one (or handed that to its retry worker), so the next test can be sent.
+     */
+    Reregistered,
 
     /** 200 `outcome: retryable` / `failed`, or another server error. */
     TryLater,
@@ -50,7 +53,7 @@ enum class TestPushMessage {
 fun TestPushResult.toMessage(): TestPushMessage =
     when (this) {
         is TestPushResult.Sent -> TestPushMessage.Sent
-        TestPushResult.Unregistered -> TestPushMessage.Reregistering
+        TestPushResult.Unregistered -> TestPushMessage.Reregistered
         TestPushResult.Retryable, TestPushResult.Failed -> TestPushMessage.TryLater
         TestPushResult.Unavailable -> TestPushMessage.ServerNotSetUp
         TestPushResult.NoRegistration -> TestPushMessage.NotRegistered
@@ -94,15 +97,15 @@ private data class TestPushState(
 )
 
 /**
- * Settings → Notifications (ADR 0003 §4.6). A switch writes [NotificationPreferencesStore], then asks the registrar
- * for a debounced re-registration, which mirrors the categories to the server (`PUT /push/registration`). The system
+ * Settings → Notifications (ADR 0003 §4.6). A switch goes to [PushControls.setCategory], which stores it and mirrors
+ * the categories to the server (`PUT /push/registration`, debounced) on the application scope. The system
  * state (permission, app and channel switches) is re-read on every resume, since the user changes it elsewhere.
  */
 @HiltViewModel
 class NotificationSettingsViewModel
     @Inject
     constructor(
-        private val preferences: NotificationPreferencesStore,
+        preferences: NotificationPreferencesStore,
         private val push: PushControls,
         private val systemReader: SystemNotificationStateReader,
         private val prompt: NotificationPromptStore,
@@ -131,10 +134,7 @@ class NotificationSettingsViewModel
             category: PushCategory,
             enabled: Boolean,
         ) {
-            viewModelScope.launch {
-                preferences.setEnabled(category, enabled)
-                push.onCategoriesChanged()
-            }
+            push.setCategory(category, enabled)
         }
 
         /** The screen resumed: the user may have changed the permission or a channel in system settings. */

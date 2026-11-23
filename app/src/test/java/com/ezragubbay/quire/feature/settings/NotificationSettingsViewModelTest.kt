@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -51,7 +52,7 @@ class NotificationSettingsViewModelTest {
     }
     private val preferences by lazy { NotificationPreferencesStore(dataStore) }
     private val prompt by lazy { NotificationPromptStore(dataStore) }
-    private val push = FakePushControls()
+    private val push by lazy { FakePushControls() }
     private var system = SystemNotificationState()
 
     @Before
@@ -87,7 +88,7 @@ class NotificationSettingsViewModelTest {
         }
 
     @Test
-    fun togglingACategory_persists_andRequestsADebouncedSync() =
+    fun togglingACategory_goesThroughTheControls_andTheStoredValueShows() =
         runTest(dispatcher) {
             val vm = newVm()
             vm.state.first { it.loaded }
@@ -97,7 +98,7 @@ class NotificationSettingsViewModelTest {
             val state = vm.state.first { !it.preferences.isEnabled(PushCategory.Files) }
             assertEquals(listOf(PushCategory.Deadlines, PushCategory.Notes), state.preferences.categories)
             assertFalse(preferences.isEnabled(PushCategory.Files))
-            assertEquals(1, push.categoryChanges)
+            assertEquals(listOf(PushCategory.Files to false), push.writes)
         }
 
     @Test
@@ -171,7 +172,7 @@ class NotificationSettingsViewModelTest {
             val cases =
                 listOf(
                     TestPushResult.Sent("e1") to TestPushMessage.Sent,
-                    TestPushResult.Unregistered to TestPushMessage.Reregistering,
+                    TestPushResult.Unregistered to TestPushMessage.Reregistered,
                     TestPushResult.Retryable to TestPushMessage.TryLater,
                     TestPushResult.Failed to TestPushMessage.TryLater,
                     TestPushResult.Unavailable to TestPushMessage.ServerNotSetUp,
@@ -194,15 +195,25 @@ class NotificationSettingsViewModelTest {
 
     @Test
     fun outcomeMapping_isPure() {
-        assertEquals(TestPushMessage.Reregistering, TestPushResult.Unregistered.toMessage())
+        assertEquals(TestPushMessage.Reregistered, TestPushResult.Unregistered.toMessage())
         assertEquals(TestPushMessage.ServerNotSetUp, TestPushResult.Unavailable.toMessage())
     }
 
-    private class FakePushControls : PushControls {
+    /** Stores switches like the real controls (on the store's scope) and records what the ViewModel asked for. */
+    private inner class FakePushControls : PushControls {
         override var available = true
         var categoryChanges = 0
+        val writes = mutableListOf<Pair<PushCategory, Boolean>>()
         var tests = 0
         var next = CompletableDeferred<TestPushResult>(TestPushResult.Sent("e0"))
+
+        override fun setCategory(
+            category: PushCategory,
+            enabled: Boolean,
+        ) {
+            writes += category to enabled
+            storeScope.launch { preferences.setEnabled(category, enabled) }
+        }
 
         override fun onCategoriesChanged() {
             categoryChanges++
