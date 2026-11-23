@@ -51,7 +51,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -121,6 +120,9 @@ class PushJourneyTest {
 
     private var scenario: ActivityScenario<MainActivity>? = null
 
+    /** An activity the test detached from [scenario]; tearDown finishes it even when an assertion failed first. */
+    private var detached: MainActivity? = null
+
     @Before
     fun setUp() {
         hilt.inject()
@@ -132,6 +134,8 @@ class PushJourneyTest {
     @After
     fun tearDown() {
         scenario?.close()
+        detached?.let { if (!it.isDestroyed) finishAndAwaitDestroyed(it) }
+        detached = null
         notificationManager.cancelAll()
     }
 
@@ -258,6 +262,7 @@ class PushJourneyTest {
         // it launched it with, so from here on it ignores this activity's lifecycle and close() would wait for a
         // DESTROYED it never sees. The test finishes the activity itself (finishAndAwaitDestroyed) instead.
         scenario = null
+        detached = running
 
         awaitTag("screen-pdf-viewer")
         assertSame("the tap must be delivered to the running activity", running, resumedMainActivity())
@@ -272,6 +277,7 @@ class PushJourneyTest {
         composeRule.onNodeWithTag("nav-courses").performClick()
         awaitTag("screen-courses")
         finishAndAwaitDestroyed(requireNotNull(running))
+        detached = null
     }
 
     // un-ignored by QMOB-E8-S4 (#64)
