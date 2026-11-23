@@ -133,7 +133,7 @@ fun NotificationPermissionCard(viewModel: NotificationPromptViewModel = hiltView
     )
 }
 
-private fun Context.showsNotificationRationale(): Boolean =
+internal fun Context.showsNotificationRationale(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         findActivity()?.let {
             ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS)
@@ -169,7 +169,7 @@ private fun PermissionCard(
     }
 }
 
-private fun appNotificationSettings(context: Context): Intent =
+internal fun appNotificationSettings(context: Context): Intent =
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

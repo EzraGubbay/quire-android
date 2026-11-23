@@ -1,13 +1,11 @@
 package com.ezragubbay.quire.push
 
-/**
- * The in-app category toggles. QMOB-E8-S5 (#65) replaces [AllCategoriesOn] with switches stored in DataStore; until
- * then every category is on.
- */
+/** The in-app category toggles; the app binds [NotificationPreferencesStore] (Settings → Notifications). */
 fun interface PushPreferences {
     suspend fun isEnabled(category: PushCategory): Boolean
 }
 
+/** Every category on: the default before the user changes a switch, and for tests. */
 object AllCategoriesOn : PushPreferences {
     override suspend fun isEnabled(category: PushCategory) = true
 }
