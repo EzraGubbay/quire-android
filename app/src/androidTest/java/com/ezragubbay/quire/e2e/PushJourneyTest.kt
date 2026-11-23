@@ -254,6 +254,10 @@ class PushJourneyTest {
         inject(pushData("push-files-added.json"))
 
         tap(FILES_TAG)
+        // onNewIntent replaced the activity's intent (setIntent). ActivityScenario follows its activity by the intent
+        // it launched it with, so from here on it ignores this activity's lifecycle and close() would wait for a
+        // DESTROYED it never sees. The test finishes the activity itself (finishAndAwaitDestroyed) instead.
+        scenario = null
 
         awaitTag("screen-pdf-viewer")
         assertSame("the tap must be delivered to the running activity", running, resumedMainActivity())
@@ -267,6 +271,7 @@ class PushJourneyTest {
         awaitTag("screen-chats")
         composeRule.onNodeWithTag("nav-courses").performClick()
         awaitTag("screen-courses")
+        finishAndAwaitDestroyed(requireNotNull(running))
     }
 
     // un-ignored by QMOB-E8-S4 (#64)
@@ -406,6 +411,16 @@ class PushJourneyTest {
                     .firstOrNull()
         }
         return resumed
+    }
+
+    private fun finishAndAwaitDestroyed(activity: MainActivity) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync { activity.finish() }
+        awaitCondition {
+            var destroyed = false
+            instrumentation.runOnMainSync { destroyed = activity.isDestroyed }
+            destroyed
+        }
     }
 
     private fun launch() {
