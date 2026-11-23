@@ -21,10 +21,10 @@ this file, the issue wins. Board: [QMOB — Quire Mobile](https://github.com/use
 | E5 | [#6](https://github.com/EzraGubbay/quire-android/issues/6) | Document viewer (PDF/decks) + downloads | 3 | 8 | 7 / 1 / 0 |
 | E6 | [#7](https://github.com/EzraGubbay/quire-android/issues/7) | AI chat (streaming) | 4 | 7 | 7 / 0 / 0 |
 | E7 | [#8](https://github.com/EzraGubbay/quire-android/issues/8) | Background upload / sync | 5 | 6 | 3 / 3 / 0 |
-| E8 | [#9](https://github.com/EzraGubbay/quire-android/issues/9) | Push notifications (Firebase) — deferred checkpoint | 6 | 6 | 5 / 0 / 1 |
+| E8 | [#9](https://github.com/EzraGubbay/quire-android/issues/9) | Push notifications (Firebase) — deferred checkpoint | 6 | 8 | 6 / 0 / 2 |
 | E9 | [#10](https://github.com/EzraGubbay/quire-android/issues/10) | Release: signing, signed APK, GitHub Release, Obtainium | 5 | 5 | 3 / 0 / 2 |
 
-Totals: 10 epics, 66 stories — 56 `agent-ready`, 6 `needs-spec`, 4 `human-only`.
+Totals: 10 epics, 68 stories — 57 `agent-ready`, 6 `needs-spec`, 5 `human-only`.
 
 ## E0 — Repo scaffold + CI/CD pipeline ([#1](https://github.com/EzraGubbay/quire-android/issues/1))
 
@@ -222,10 +222,12 @@ Open questions:
 |---|---|---|---|---|---|---|
 | E8-SP | [#61](https://github.com/EzraGubbay/quire-android/issues/61) | Spike: push architecture + event catalogue (FCM) | S | 6 | `agent-ready` | — |
 | E8-S1 | [#62](https://github.com/EzraGubbay/quire-android/issues/62) | Firebase project + credentials (human setup) | XS | 6 | `human-only` | — |
-| E8-S2 | [quire#41](https://github.com/EzraGubbay/quire/issues/41) | Server: device registration + FCM sender (apps/web) | M | 6 | `agent-ready` | E8-SP, E8-S1 |
-| E8-S3 | [#63](https://github.com/EzraGubbay/quire-android/issues/63) | Android: FCM registration, notification channels, permission | S | 6 | `agent-ready` | E8-S2 |
+| E8-S2a | [quire#41](https://github.com/EzraGubbay/quire/issues/41) | Server: push registration API + FCM sender (apps/web) | M | 6 | `agent-ready` | E8-SP, E8-S1 |
+| E8-S2b | [quire#53](https://github.com/EzraGubbay/quire/issues/53) | Server: push triggers (Lemida files, homework due, synthesized notes) | S | 6 | `agent-ready` | E8-S2a |
+| E8-S3 | [#63](https://github.com/EzraGubbay/quire-android/issues/63) | Android: FCM registration, notification channels, permission | S | 6 | `agent-ready` | E8-S2a |
 | E8-S4 | [#64](https://github.com/EzraGubbay/quire-android/issues/64) | Notification deep links into course / file / thread | S | 6 | `agent-ready` | E8-S3 |
 | E8-S5 | [#65](https://github.com/EzraGubbay/quire-android/issues/65) | Notification preferences | XS | 6 | `agent-ready` | E8-S3 |
+| E8-S6 | [#155](https://github.com/EzraGubbay/quire-android/issues/155) | release.yml: decode GOOGLE_SERVICES_JSON_BASE64 | XS | 6 | `human-only` | E8-S3 |
 
 Open questions: resolved by [ADR 0003](adr/0003-push-notifications.md) (event catalogue, payload, credential via
 `deploy.yml` → `/srv/quire/.env`, server-side category filtering); Firebase set up 2026-11-23 (E8-S1).

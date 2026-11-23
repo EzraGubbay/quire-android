@@ -25,7 +25,7 @@ Option (human decision): pull QMOB-E9-S1 and QMOB-E9-S3 forward into Sprint 2 to
 | Sprint 3 — Browse & Read (v0.3.0) | planned (closed) | E4, E5 | v0.3.0 | 14 | 1/9/4 |
 | Sprint 4 — AI Chat (v0.4.0) | planned (closed) | E6 | v0.4.0 | 7 | 0/5/2 |
 | Sprint 5 — Sync & Release (v1.0.0) | planned (closed) | E1, E7, E9 | v1.0.0 | 12 | 1/8/3 |
-| Sprint 6 — Push Notifications (v1.1.0) | planned (closed) | E8 | v1.1.0 | 6 | 2/3/1 |
+| Sprint 6 — Push Notifications (v1.1.0) | planned (closed) | E8 | v1.1.0 | 8 | 3/4/1 |
 
 Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E1 lives there): *QMOB Sprint 1 — Mobile API v1* (open); *QMOB Sprint 5 — Mobile uploads API* (planned); *QMOB Sprint 6 — Push sender* (planned).
 
@@ -145,6 +145,8 @@ Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E
 
 - [ ] Deferred checkpoint passed: Firebase set up by the human (QMOB-E8-S1), ADR 0003 merged, E8 stories specced.
 - [ ] A real push arrives on the phone and opens the right screen.
+- [ ] No `PushJourneyTest` case is still Ignored with reason `QMOB-E8`. Once E8-S3 lands the journey, those Ignored
+  cases block every `dev-rc` → `main` release PR (the CI release gate) until E8 is done.
 - [ ] **Android is complete — iOS may start.**
 - [ ] Release PR `dev-rc` → `main` green: `build`, `lint`, `unit-tests`, `e2e`.
 
@@ -152,10 +154,12 @@ Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E
 |---|---|---|---|---|
 | E8-SP | [#61](https://github.com/EzraGubbay/quire-android/issues/61) | Spike: push architecture + event catalogue (FCM) | S | `agent-ready` |
 | E8-S1 | [#62](https://github.com/EzraGubbay/quire-android/issues/62) | Firebase project + credentials (human setup) | XS | `human-only` |
-| E8-S2 | [quire#41](https://github.com/EzraGubbay/quire/issues/41) | Server: device registration + FCM sender (apps/web) | M | `agent-ready` |
+| E8-S2a | [quire#41](https://github.com/EzraGubbay/quire/issues/41) | Server: push registration API + FCM sender (apps/web) | M | `agent-ready` |
+| E8-S2b | [quire#53](https://github.com/EzraGubbay/quire/issues/53) | Server: push triggers (Lemida files, homework due, synthesized notes) | S | `agent-ready` |
 | E8-S3 | [#63](https://github.com/EzraGubbay/quire-android/issues/63) | Android: FCM registration, notification channels, permission | S | `agent-ready` |
 | E8-S4 | [#64](https://github.com/EzraGubbay/quire-android/issues/64) | Notification deep links into course / file / thread | S | `agent-ready` |
 | E8-S5 | [#65](https://github.com/EzraGubbay/quire-android/issues/65) | Notification preferences | XS | `agent-ready` |
+| E8-S6 | [#155](https://github.com/EzraGubbay/quire-android/issues/155) | release.yml: decode GOOGLE_SERVICES_JSON_BASE64 | XS | `human-only` |
 
 ## Suggested order inside Sprint 1
 
