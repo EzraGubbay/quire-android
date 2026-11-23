@@ -70,12 +70,14 @@ class PushRegistrarTest {
         server.shutdown()
     }
 
-    private fun registrar(tokens: FcmTokenSource = FakeTokenSource()) =
-        PushRegistrar(
+    private fun registrar(
+        tokens: FcmTokenSource = FakeTokenSource(),
+        preferences: PushPreferences = AllCategoriesOn,
+    ) = PushRegistrar(
             tokens = tokens,
             client = client,
             device = PushDevice(appVersion = "1.1.0") { signedIn },
-            categories = PushCategoryPolicy({ allowed }),
+            categories = PushCategoryPolicy({ allowed }, preferences),
             retry = retry,
             scope = scope,
         )
@@ -191,6 +193,41 @@ class PushRegistrarTest {
             while (retry.enqueued == 0 && System.currentTimeMillis() < deadline) Thread.sleep(10)
             assertEquals(1, retry.enqueued)
         }
+
+    @Test
+    fun onCategoriesChanged_debounces_toOnePutWithTheLatestCategories() =
+        runBlocking {
+            server.enqueue(fixtureResponse("putPushRegistration.200.json"))
+            val off = mutableSetOf<PushCategory>()
+            val registrar = registrar(preferences = PushPreferences { it !in off })
+
+            // Three quick flips (a user toggling files off, on, off; then deadlines off) settle into one PUT.
+            off += PushCategory.Files
+            registrar.onCategoriesChanged()
+            off -= PushCategory.Files
+            registrar.onCategoriesChanged()
+            off += PushCategory.Files
+            off += PushCategory.Deadlines
+            registrar.onCategoriesChanged()
+
+            val put = take()
+            assertEquals("PUT", put.method)
+            assertEquals(JsonArray(listOf(JsonPrimitive("notes"))), put.json()["categories"])
+            assertNull(server.takeRequest(PushRegistrar.CATEGORY_SYNC_DEBOUNCE_MS * 2, TimeUnit.MILLISECONDS))
+        }
+
+    @Test
+    fun onCategoriesChanged_notConfigured_sendsNothing() {
+        registrar(NoopTokenSource).onCategoriesChanged()
+
+        assertNull(server.takeRequest(PushRegistrar.CATEGORY_SYNC_DEBOUNCE_MS * 2, TimeUnit.MILLISECONDS))
+    }
+
+    @Test
+    fun available_followsTheTokenSource() {
+        assertTrue(registrar().available)
+        assertFalse(registrar(NoopTokenSource).available)
+    }
 
     @Test
     fun tokenUnavailable_isRetried_andNeverLogsTheMessage() =
