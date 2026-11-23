@@ -225,4 +225,7 @@
     <string name="push_permission_title">Get notified about new course files and homework deadlines</string>
     <string name="push_permission_allow">Allow</string>
     <string name="push_permission_not_now">Not now</string>
+    <string name="push_target_missing_file">That file is no longer available</string>
+    <string name="push_target_missing_note">That note is no longer available</string>
+    <string name="push_target_missing_course">That course is no longer available</string>
 </resources>

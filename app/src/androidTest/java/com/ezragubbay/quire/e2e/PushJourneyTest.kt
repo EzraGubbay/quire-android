@@ -1,10 +1,13 @@
 package com.ezragubbay.quire.e2e
 
 import android.Manifest
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
 import android.os.SystemClock
 import android.service.notification.StatusBarNotification
 import androidx.compose.ui.semantics.SemanticsActions
@@ -23,6 +26,8 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.core.data.session.SessionRepository
 import com.ezragubbay.quire.core.network.TokenCache
@@ -43,6 +48,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Ignore
@@ -68,7 +74,9 @@ import javax.inject.Inject
  * hands out the fixed [FakeFcmTokenSource.TOKEN]. A "push" is injected by building
  * `RemoteMessage.Builder("quire@fcm.googleapis.com").setData(map).build()` and passing `.data` to the app's
  * [PushMessageHandler] — the same call `QuireMessagingService.onMessageReceived` makes. Notifications are asserted
- * through `NotificationManager.activeNotifications` (channel, tag) and opened with `contentIntent.send()`.
+ * through `NotificationManager.activeNotifications` (channel, tag) and opened by sending their `contentIntent` (see
+ * [tap]: with the background-start opt-in a System UI tap carries, then waiting for `MainActivity` to resume). Every
+ * tap case cold-starts the app except [filesAdded_tapWhileRunning_replacesBackStack], which taps while it runs.
  * `POST_NOTIFICATIONS` is granted up front ([GrantPermissionRule]).
  *
  * UI is found by **test tag only** (the contract in `docs/e2e/E8-push.md`).
@@ -207,7 +215,7 @@ class PushJourneyTest {
 
     // --- Deep links: un-ignored by QMOB-E8-S4 (#64) -------------------------------------------------
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun filesAdded_single_tapOpensViewer_backReturnsToCourse() {
         seedSignedIn()
@@ -220,7 +228,7 @@ class PushJourneyTest {
         awaitTag("screen-course")
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun filesAdded_many_tapOpensCourse() {
         seedSignedIn()
@@ -232,7 +240,41 @@ class PushJourneyTest {
         composeRule.onNodeWithTag("screen-pdf-viewer").assertDoesNotExist()
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // Added by QMOB-E8-S4 (#64): a tap while the app runs reaches the same activity (onNewIntent) and replaces the
+    // shell's back stack, so back walks target -> course -> Courses, not back into the tab that was open.
+    @Test
+    fun filesAdded_tapWhileRunning_replacesBackStack() {
+        seedSignedIn()
+        launch()
+        awaitTag("screen-courses")
+        composeRule.onNodeWithTag("nav-chats").performClick()
+        awaitTag("screen-chats")
+        val running = resumedMainActivity()
+        assertNotNull(running)
+        inject(pushData("push-files-added.json"))
+
+        tap(FILES_TAG)
+        // onNewIntent replaced the activity's intent (setIntent). ActivityScenario follows its activity by the intent
+        // it launched it with, so from here on it ignores this activity's lifecycle and close() would wait for a
+        // DESTROYED it never sees. The test finishes the activity itself (finishAndAwaitDestroyed) instead.
+        scenario = null
+
+        awaitTag("screen-pdf-viewer")
+        assertSame("the tap must be delivered to the running activity", running, resumedMainActivity())
+        Espresso.pressBack()
+        awaitTag("screen-course")
+        Espresso.pressBack()
+        awaitTag("screen-courses")
+        composeRule.onNodeWithTag("screen-chats").assertDoesNotExist()
+        // The tabs still work after the reset.
+        composeRule.onNodeWithTag("nav-chats").performClick()
+        awaitTag("screen-chats")
+        composeRule.onNodeWithTag("nav-courses").performClick()
+        awaitTag("screen-courses")
+        finishAndAwaitDestroyed(requireNotNull(running))
+    }
+
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun homeworkDue_tapOpensSheet() {
         seedSignedIn()
@@ -243,7 +285,7 @@ class PushJourneyTest {
         awaitTag("screen-pdf-viewer")
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun noteSynthesized_ready_tapOpensNoteReader() {
         seedSignedIn()
@@ -254,7 +296,7 @@ class PushJourneyTest {
         awaitTag("screen-note-reader")
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S4 (#64)
+    // un-ignored by QMOB-E8-S4 (#64)
     @Test
     fun deletedFile_tapFallsBackToCourseWithMessage() {
         seedSignedIn()
@@ -332,12 +374,53 @@ class PushJourneyTest {
         return pushNotifications().first { it.tag == tag }
     }
 
-    /** Opens the notification tagged [tag] the way a tap does. */
+    /**
+     * Opens the notification tagged [tag] the way a tap does, then waits for `MainActivity` to be resumed (a tap on
+     * a closed app cold-starts it; until it is, there is no compose hierarchy to query). System UI sends a real tap
+     * with its own background-start privilege; this test is the sender here, so it opts in to the same for the send.
+     */
     private fun tap(tag: String) {
         val notification = awaitNotification(tag).notification
         assertNotNull(notification.contentIntent)
-        notification.contentIntent.send()
+        notification.contentIntent.send(context, 0, null, null, null, null, tapOptions())
+        awaitCondition { resumedMainActivity() != null }
         composeRule.waitForIdle()
+    }
+
+    private fun tapOptions(): Bundle? {
+        val mode =
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA ->
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+                    @Suppress("DEPRECATION") // Replaced by ALLOW_ALWAYS on API 36; still the one API 34-35 know.
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                else -> return null
+            }
+        return ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(mode).toBundle()
+    }
+
+    private fun resumedMainActivity(): MainActivity? {
+        var resumed: MainActivity? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            resumed =
+                ActivityLifecycleMonitorRegistry
+                    .getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)
+                    .filterIsInstance<MainActivity>()
+                    .firstOrNull()
+        }
+        return resumed
+    }
+
+    private fun finishAndAwaitDestroyed(activity: MainActivity) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync { activity.finish() }
+        awaitCondition {
+            var destroyed = false
+            instrumentation.runOnMainSync { destroyed = activity.isDestroyed }
+            destroyed
+        }
     }
 
     private fun launch() {
@@ -405,6 +488,7 @@ class PushJourneyTest {
                         "GET /courses/signals-and-systems/sessions" -> json("course-sessions.json")
                         "GET /courses/signals-and-systems/files" -> json("course-files.json")
                         "GET /courses/signals-and-systems/notes" -> json("course-notes.json")
+                        "GET /courses/signals-and-systems/files/$PUSH_FILE_ID" -> json("push-file.json")
                         "GET /courses/signals-and-systems/notes/$PUSH_NOTE_ID" -> json("reader-note.json")
                         else -> json("error-not-found.json", 404)
                     }

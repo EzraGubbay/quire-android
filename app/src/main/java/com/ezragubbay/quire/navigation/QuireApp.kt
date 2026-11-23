@@ -22,6 +22,7 @@ import com.ezragubbay.quire.feature.auth.PairViewModel
 import com.ezragubbay.quire.feature.auth.scan.PairUriParser
 import com.ezragubbay.quire.feature.auth.scan.PairUriResult
 import com.ezragubbay.quire.feature.auth.scan.ScanScreen
+import com.ezragubbay.quire.push.PushTargetResolver
 import kotlinx.serialization.Serializable
 
 /** Pair screen; [server] / [code] arrive from a `quire://pair?server=&code=` deep link. */
@@ -42,14 +43,17 @@ data object ShellRoute
 
 /**
  * Root navigation: Pair when signed out, the shell when signed in. The start destination comes from the
- * persisted session; later flips (paired, session expired) navigate and clear the back stack.
+ * persisted session; later flips (paired, session expired) navigate and clear the back stack. A tapped notification's
+ * target ([AppViewModel.pendingPushTarget]) is handed to the shell, which checks it with [pushTargetResolver].
  */
 @Composable
 fun QuireApp(
     appViewModel: AppViewModel,
     pairViewModel: PairViewModel,
+    pushTargetResolver: PushTargetResolver = PushTargetResolver.Unchecked,
 ) {
     val signedIn by appViewModel.signedIn.collectAsStateWithLifecycle()
+    val pushTarget by appViewModel.pendingPushTarget.collectAsStateWithLifecycle()
     val expired by appViewModel.sessionExpired.collectAsStateWithLifecycle()
     val account by appViewModel.session.collectAsStateWithLifecycle()
     val isSignedIn = signedIn ?: return
@@ -123,7 +127,13 @@ fun QuireApp(
             // the shell is disposed BEFORE the LaunchedEffect below pops (and destroys) its entry. That closes the
             // race where a nested screen recomposed (e.g. on the 401 that expired the session) on a dead entry.
             if (isSignedIn && lifecycleState != Lifecycle.State.DESTROYED) {
-                AppShell(account = account as? SessionState.SignedIn, onSignOut = appViewModel::signOut)
+                AppShell(
+                    account = account as? SessionState.SignedIn,
+                    onSignOut = appViewModel::signOut,
+                    pushTarget = pushTarget,
+                    pushTargetResolver = pushTargetResolver,
+                    onPushTargetConsumed = appViewModel::onPushTargetConsumed,
+                )
             }
         }
     }
