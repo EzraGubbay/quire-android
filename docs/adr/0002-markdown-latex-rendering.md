@@ -139,7 +139,7 @@ future Compose LaTeX lib) without touching the tag contract or the rest of the r
 - Markwon is dormant; the block-segmentation seam is the exit if it ever needs replacing.
 - Markwon's ext-latex only knows `$$…$$` (inline inside a line, block on its own lines); the server writes `$…$`
   inline and the model sometimes `\(…\)` / `\[…\]`. `mathMarkdownBlocks` (`feature/notes/MathDelimiters.kt`) ports the
-  web app's `normalizeMathDelimiters` and rewrites inline `$…$` to `$$…$$` before rendering, outside code.
+  web app's display-math normalisation and rewrites inline `$…$` / `\(…\)` to `$$…$$` before rendering, outside code.
 - JLaTeXMath resolves many built-in macros (`\dfrac`, `cases`, `pmatrix`, …) by class/method name, so
   `proguard-rules.pro` keeps `org.scilab.forge.jlatexmath.**` whole; without it those formulas fail in release builds.
 

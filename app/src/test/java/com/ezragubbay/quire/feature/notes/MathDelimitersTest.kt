@@ -4,17 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MathDelimitersTest {
-    // --- normalizeMathDelimiters: parity with the web app's normalizeMathDelimiters ----------------------------------
-
-    @Test
-    fun backslashParens_becomeSingleDollar() {
-        assertEquals("Euler: \$e^{i\\pi}\$.", normalizeMathDelimiters("Euler: \\(e^{i\\pi}\\)."))
-    }
-
-    @Test
-    fun backslashParensWithInnerSpaces_areTrimmed() {
-        assertEquals("so \$x+1\$ holds", normalizeMathDelimiters("so \\( x+1 \\) holds"))
-    }
+    // --- normalizeMathDelimiters: parity with the web app's normalizeMathDelimiters (display half) -------------------
 
     @Test
     fun backslashBrackets_becomeDisplayMathOnTheirOwnLines() {
@@ -36,6 +26,13 @@ class MathDelimitersTest {
     }
 
     @Test
+    fun texLineBreakBeforeBracketOrParen_isNotADelimiter() {
+        val display = "\$\$\na \\\\[2pt] b \\\\(c) d\n\$\$"
+        assertEquals(display, normalizeMathDelimiters(display))
+        assertEquals("\$\$a \\\\(b)\$\$", markwonInlineMath("\$a \\\\(b)\$"))
+    }
+
+    @Test
     fun displayMathOnListAndQuoteLines_isLeftInline() {
         val md = "- item \$\$x\$\$\n> quote \$\$y\$\$\n1. step \$\$z\$\$"
         assertEquals(md, normalizeMathDelimiters(md))
@@ -45,15 +42,73 @@ class MathDelimitersTest {
     fun delimitersInsideCode_areUntouched() {
         val md = "Run `\\(x\\)` and `\$\$a\$\$`:\n```\nprint(\"\\[y\\]\")\n\$\$ z \$\$\n```"
         assertEquals(md, normalizeMathDelimiters(md))
+        assertEquals(md, markwonInlineMath(md))
     }
 
     @Test
     fun unclosedFence_isCodeToTheEnd() {
-        val md = "```\n\\(x\\)"
+        val md = "```\n\\[x\\]"
         assertEquals(md, normalizeMathDelimiters(md))
+        assertEquals("```\n\\(x\\)", markwonInlineMath("```\n\\(x\\)"))
     }
 
-    // --- markwonInlineMath: `$…$` to Markwon's inline `$$…$$` --------------------------------------------------------
+    // --- markwonInlineMath: `$…$` and `\(…\)` to Markwon's inline `$$…$$` ------------------------------------------
+
+    @Test
+    fun backslashParens_becomeMarkwonInline() {
+        assertEquals("Euler: \$\$e^{i\\pi}\$\$.", markwonInlineMath("Euler: \\(e^{i\\pi}\\)."))
+    }
+
+    @Test
+    fun backslashParensWithInnerSpaces_areTrimmed() {
+        assertEquals("so \$\$x+1\$\$ holds", markwonInlineMath("so \\( x+1 \\) holds"))
+    }
+
+    @Test
+    fun backslashParens_bypassTheCurrencyRule() {
+        // Explicit delimiters: a following digit (or inner spaces) does not stop them, unlike `$…$`.
+        assertEquals("\$\$a\$\$2 and \$\$b\$\$", markwonInlineMath("\\(a\\)2 and \\( b \\)"))
+    }
+
+    @Test
+    fun escapedBackslashBeforeParen_isNotADelimiter() {
+        val md = "a \\\\(b\\) c"
+        assertEquals(md, markwonInlineMath(md))
+    }
+
+    @Test
+    fun unclosedBackslashParen_isLeftAsIs() {
+        val md = "so \\(x + "
+        assertEquals(md, markwonInlineMath(md))
+    }
+
+    @Test
+    fun inlineMathInAListItem_isRewritten() {
+        assertEquals("- item \$\$x\$\$\n- next \$\$y_1\$\$", markwonInlineMath("- item \$x\$\n- next \$y_1\$"))
+    }
+
+    @Test
+    fun inlineMathInATableRow_isRewrittenAndCurrencyKept() {
+        assertEquals(
+            "| a | \$\$x^2\$\$ | \$5 |\n|---|---|---|",
+            markwonInlineMath("| a | \$x^2\$ | \$5 |\n|---|---|---|"),
+        )
+    }
+
+    @Test
+    fun hebrewDirectlyAdjacentToDollars_isRewritten() {
+        assertEquals("השונות\$\$\\sigma^2\$\$היא", markwonInlineMath("השונות\$\\sigma^2\$היא"))
+        assertEquals("ב-\$\$x\$\$ ו-\$\$y\$\$", markwonInlineMath("ב-\$x\$ ו-\$y\$"))
+    }
+
+    @Test
+    fun unclosedDoubleDollarMidStream_isNotPairedWithALaterInline() {
+        // Mid-stream `$$x + 1` has no closer yet; the rest stays as-is, so `$y$` is not turned into a `$$` that
+        // Markwon would pair with the open `$$`. The next delta closes it and the whole answer rewrites normally.
+        val md = "so \$\$x + 1 and \$y\$"
+        assertEquals(md, markwonInlineMath(md))
+        assertEquals("so \$\$x + 1\$\$ and \$\$y\$\$", markwonInlineMath("so \$\$x + 1\$\$ and \$y\$"))
+    }
 
     @Test
     fun singleDollarInline_becomesMarkwonInline() {
