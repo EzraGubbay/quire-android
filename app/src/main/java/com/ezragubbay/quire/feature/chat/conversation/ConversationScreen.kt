@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -188,11 +188,11 @@ private fun MessageList(
         }
         if (!atBottom && bubbles.isNotEmpty()) {
             val scope = rememberCoroutineScope()
-            AssistChip(
+            // A filled (primary/onPrimary) button: opaque, so it stays legible over the messages behind it.
+            Button(
                 onClick = { scope.launch { listState.animateScrollToItem(bubbles.lastIndex) } },
-                label = { Text(stringResource(R.string.conversation_jump_latest)) },
                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp).testTag("action-jump-latest"),
-            )
+            ) { Text(stringResource(R.string.conversation_jump_latest)) }
         }
     }
 }

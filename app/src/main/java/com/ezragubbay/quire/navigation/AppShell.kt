@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -74,7 +75,8 @@ fun AppShell(
             // Settings brings its own large top bar (with back).
             if (!onSettings) {
                 TopAppBar(
-                    title = { Text(current?.label.orEmpty()) },
+                    // Bold here only: titleLarge's SemiBold renders thin in some device system fonts.
+                    title = { Text(current?.label.orEmpty(), fontWeight = FontWeight.Bold) },
                     actions = {
                         if (current == TopLevelDestination.Courses) {
                             IconButton(
