@@ -2,6 +2,8 @@
 <resources>
     <!-- Brand primary (matches QuireColors light primary). -->
     <color name="ic_launcher_background">#6E1E2B</color>
+    <!-- Theme primary for platform views (QuireColors light/dark primary): links, selection. -->
+    <color name="brand_primary">#6E1E2B</color>
     <!-- Splash background = theme background (QuireColors light/dark background). -->
     <color name="splash_background">#F6F1E7</color>
 </resources>

@@ -62,7 +62,30 @@ class AppIconResourcesTest {
             val items = itemsByName(style)
             assertEquals(dir, "@color/splash_background", items["windowSplashScreenBackground"])
             assertEquals(dir, "@drawable/ic_logo_placeholder", items["windowSplashScreenAnimatedIcon"])
+            // The white mark needs the brand disc behind it to be visible on the parchment splash.
+            assertEquals(dir, "@color/ic_launcher_background", items["windowSplashScreenIconBackgroundColor"])
             assertEquals(dir, "@style/Theme.Quire", items["postSplashScreenTheme"])
+        }
+    }
+
+    /** Platform views (Markwon TextViews) take links and selection handles from the window theme, not Compose. */
+    @Test
+    fun appThemeTintsLinksAndSelectionWithBrandPrimary() {
+        mapOf("values" to "#6E1E2B", "values-night" to "#E28A93").forEach { (dir, primary) ->
+            val styles = parse(File(res, "$dir/themes.xml")).getElementsByTagName("style")
+            val app =
+                (0 until styles.length)
+                    .map { styles.item(it) as Element }
+                    .single { it.getAttribute("name") == "Theme.Quire" }
+            val items = itemsByName(app)
+            assertEquals(dir, "@color/brand_primary", items["android:colorAccent"])
+            assertEquals(dir, "@color/brand_primary", items["android:textColorLink"])
+            val colors = parse(File(res, "$dir/colors.xml")).getElementsByTagName("color")
+            val brand =
+                (0 until colors.length)
+                    .map { colors.item(it) as Element }
+                    .single { it.getAttribute("name") == "brand_primary" }
+            assertEquals(dir, primary, brand.textContent.trim())
         }
     }
 
