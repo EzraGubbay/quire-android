@@ -205,8 +205,8 @@ class PushMessageHandlerTest {
         assertEquals(
             listOf(
                 "files:3f0b1c7e-2a7d-4d8e-9b1a-6c5e4f3a2b10",
-                "homework:c2d3e4f5-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
-                "note:0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f",
+                "homework:0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b",
+                "note:2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
                 "test",
             ),
             tags,
@@ -218,7 +218,7 @@ class PushMessageHandlerTest {
     fun noteReady_looksUpNoteTitle_testLooksUpNothing() {
         val note = (handler().handle(pushData("push.note.synthesized.json")) as PushHandleResult.Posted).spec
         assertEquals("Lecture 3 notes", note.body)
-        assertTrue(lookup.calls.contains("note:0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"))
+        assertTrue(lookup.calls.contains("note:2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f"))
 
         lookup.calls.clear()
         handler().handle(pushData("push.test.json"))

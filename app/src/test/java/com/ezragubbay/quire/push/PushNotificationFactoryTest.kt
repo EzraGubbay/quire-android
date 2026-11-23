@@ -65,22 +65,23 @@ class PushNotificationFactoryTest {
 
     @Test
     fun homeworkDue_tomorrowInDeviceZone_withSheet() {
-        // dueAt 2026-11-25T21:59Z is 23:59 on 25 Nov in Jerusalem (UTC+2); now is 24 Nov there.
+        // dueAt 2026-11-24T21:59Z is 23:59 on 24 Nov in Jerusalem (UTC+2); now is 23 Nov there.
+        now = Instant.parse("2026-11-23T10:00:00Z")
         val spec =
             factory.build(
                 event("push.homework.due.json"),
                 PushNames(courseName = "Signals and Systems", itemTitle = "HW 3 sheet"),
             )
         assertEquals(PushChannels.DEADLINES, spec.channelId)
-        assertEquals("homework:c2d3e4f5-6a7b-4c8d-9e0f-1a2b3c4d5e6f", spec.tag)
+        assertEquals("homework:0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b", spec.tag)
         assertEquals("Homework 3 due tomorrow 23:59", spec.title)
         assertEquals("Signals and Systems · HW 3 sheet", spec.body)
-        assertEquals(PushTarget.File("signals-and-systems", "d4e5f6a7-8b9c-4d0e-9f1a-2b3c4d5e6f70"), spec.target)
+        assertEquals(PushTarget.File("signals-and-systems", "9c4e2b1a-7d3f-4a6b-8e2c-1f0a9b8c7d6e"), spec.target)
     }
 
     @Test
     fun homeworkDue_today_andWithoutSheetOpensCourse() {
-        now = Instant.parse("2026-11-25T08:00:00Z")
+        now = Instant.parse("2026-11-24T08:00:00Z")
         val noSheet = PushPayloadParser.parse(pushData("push.homework.due.json") - "fileId")!!
         val spec = factory.build(noSheet)
         assertEquals("Homework 3 due today 23:59", spec.title)
@@ -92,11 +93,11 @@ class PushNotificationFactoryTest {
     fun noteSynthesized_readyOpensNote_failedOpensCourse() {
         val ready = factory.build(event("push.note.synthesized.json"), PushNames(itemTitle = "Lecture 3 notes"))
         assertEquals(PushChannels.NOTES, ready.channelId)
-        assertEquals("note:0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f", ready.tag)
+        assertEquals("note:2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f", ready.tag)
         assertEquals("Study note ready", ready.title)
         assertEquals("Lecture 3 notes", ready.body)
-        assertEquals(PushTarget.Note("signals-and-systems", "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"), ready.target)
-        assertEquals("0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f", ready.extras["noteId"])
+        assertEquals(PushTarget.Note("signals-and-systems", "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f"), ready.target)
+        assertEquals("2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f", ready.extras["noteId"])
 
         val fallback = factory.build(event("push.note.synthesized.json"))
         assertEquals("A new study note is ready in a course.", fallback.body)
@@ -118,6 +119,6 @@ class PushNotificationFactoryTest {
         assertEquals("Test sent from your server.", spec.body)
         assertEquals(PushTarget.Home, spec.target)
         assertEquals(mapOf("type" to "push.test"), spec.extras)
-        assertEquals("f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b", spec.eventId)
+        assertEquals("7a1c2f0e-5b7d-4c2a-9a51-0f3e6d1b2c44", spec.eventId)
     }
 }

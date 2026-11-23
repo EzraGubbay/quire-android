@@ -23,10 +23,10 @@ class PushPayloadParserTest {
     @Test
     fun homeworkDueFixtureParses() {
         val event = PushPayloadParser.parse(pushData("push.homework.due.json")) as PushEvent.HomeworkDue
-        assertEquals("c2d3e4f5-6a7b-4c8d-9e0f-1a2b3c4d5e6f", event.assignmentId)
+        assertEquals("0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b", event.assignmentId)
         assertEquals("3", event.number)
-        assertEquals(Instant.parse("2026-11-25T21:59:00Z"), event.dueAt)
-        assertEquals("d4e5f6a7-8b9c-4d0e-9f1a-2b3c4d5e6f70", event.fileId)
+        assertEquals(Instant.parse("2026-11-24T21:59:00Z"), event.dueAt)
+        assertEquals("9c4e2b1a-7d3f-4a6b-8e2c-1f0a9b8c7d6e", event.fileId)
         assertEquals(PushCategory.Deadlines, event.category)
     }
 
@@ -40,7 +40,7 @@ class PushPayloadParserTest {
     fun noteSynthesizedFixtureParses_readyAndFailed() {
         val ready = PushPayloadParser.parse(pushData("push.note.synthesized.json")) as PushEvent.NoteSynthesized
         assertEquals(true, ready.ready)
-        assertEquals("0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f", ready.noteId)
+        assertEquals("2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f", ready.noteId)
         val failed =
             PushPayloadParser.parse(pushData("push.note.synthesized.json") + ("outcome" to "failed"))
                 as PushEvent.NoteSynthesized
@@ -50,7 +50,7 @@ class PushPayloadParserTest {
     @Test
     fun testFixtureParses() {
         assertEquals(
-            PushEvent.Test("f1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b"),
+            PushEvent.Test("7a1c2f0e-5b7d-4c2a-9a51-0f3e6d1b2c44"),
             PushPayloadParser.parse(pushData("push.test.json")),
         )
     }

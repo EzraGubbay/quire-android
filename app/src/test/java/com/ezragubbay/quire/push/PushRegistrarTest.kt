@@ -244,7 +244,7 @@ class PushRegistrarTest {
         runBlocking {
             server.enqueue(fixtureResponse("sendTestPush.200.json"))
 
-            assertEquals(TestPushResult.Sent("<uuid>"), registrar().sendTest())
+            assertEquals(TestPushResult.Sent("7a1c2f0e-5b7d-4c2a-9a51-0f3e6d1b2c44"), registrar().sendTest())
 
             val request = take()
             assertEquals("POST", request.method)

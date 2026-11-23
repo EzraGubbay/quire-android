@@ -238,7 +238,7 @@ class PushJourneyTest {
         seedSignedIn()
         inject(pushData("push-homework-due.json"))
 
-        tap("homework:c2d3e4f5-6a7b-4c8d-9e0f-1a2b3c4d5e6f")
+        tap("homework:0e9d8c7b-6a5f-4e3d-9c2b-1a0f9e8d7c6b")
 
         awaitTag("screen-pdf-viewer")
     }
@@ -249,7 +249,7 @@ class PushJourneyTest {
         seedSignedIn()
         inject(pushData("push-note-ready.json"))
 
-        tap("note:0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f")
+        tap("note:$PUSH_NOTE_ID")
 
         awaitTag("screen-note-reader")
     }
@@ -437,7 +437,7 @@ class PushJourneyTest {
         const val PAIRED_TOKEN = "qd_live_3f9a8c7e6d5b4a3928171605f4e3d2c1"
         const val FILES_TAG = "files:3f0b1c7e-2a7d-4d8e-9b1a-6c5e4f3a2b10"
         const val PUSH_FILE_ID = "9c4e2b1a-7d3f-4a6b-8e2c-1f0a9b8c7d6e"
-        const val PUSH_NOTE_ID = "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f"
+        const val PUSH_NOTE_ID = "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f"
         const val TIMEOUT_MS = 10_000L
         const val TIMEOUT_S = 10L
         const val POLL_MS = 50L
