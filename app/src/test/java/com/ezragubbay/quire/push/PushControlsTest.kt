@@ -1,6 +1,7 @@
 package com.ezragubbay.quire.push
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import app.cash.turbine.test
 import com.ezragubbay.quire.core.network.FakeServerConfig
 import com.ezragubbay.quire.core.network.FakeTokenProvider
 import com.ezragubbay.quire.core.network.NetworkOptions
@@ -14,7 +15,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -33,6 +33,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 class PushControlsTest {
     @get:Rule val logs = PushLogRule()
@@ -137,11 +138,17 @@ class PushControlsTest {
         runBlocking {
             val controls = controls(NoopTokenSource)
 
-            controls.setCategory(PushCategory.Files, enabled = false)
+            // Subscribed, with the stored value in hand, before the flip: a DataStore collector that starts while a
+            // write is in flight can miss that write for good (DataStore 1.1.x tags its lock-free first read with the
+            // writer's new version, then drops the write's own update as already seen). Turbine's timeout keeps a
+            // swallowed write failure from hanging the run.
+            store.preferences.test(timeout = 5.seconds) {
+                assertTrue(awaitItem().isEnabled(PushCategory.Files))
 
-            // Bounded: a swallowed DataStore failure must fail the test, not hang the run.
-            val stored = withTimeout(5_000) { store.preferences.first { !it.isEnabled(PushCategory.Files) } }
-            assertFalse(stored.isEnabled(PushCategory.Files))
+                controls.setCategory(PushCategory.Files, enabled = false)
+
+                assertFalse(awaitItem().isEnabled(PushCategory.Files))
+            }
             noRequestWithinTwoDebounces()
             assertEquals(0, server.requestCount)
         }
