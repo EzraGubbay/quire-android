@@ -172,7 +172,7 @@ internal fun rememberMarkwon(): Markwon {
     return remember(context, color, textPx) { buildMarkwon(context, color, textPx) }
 }
 
-private fun buildMarkwon(
+internal fun buildMarkwon(
     context: Context,
     color: Int,
     textPx: Float,

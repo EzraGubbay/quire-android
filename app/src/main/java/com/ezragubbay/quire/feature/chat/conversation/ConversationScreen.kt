@@ -57,8 +57,8 @@ import com.ezragubbay.quire.core.designsystem.component.ErrorState
 import com.ezragubbay.quire.core.network.CitationDto
 import com.ezragubbay.quire.feature.notes.BlockView
 import com.ezragubbay.quire.feature.notes.NoteBlock
+import com.ezragubbay.quire.feature.notes.mathMarkdownBlocks
 import com.ezragubbay.quire.feature.notes.rememberMarkwon
-import com.ezragubbay.quire.feature.notes.segmentMarkdown
 import kotlinx.coroutines.launch
 
 const val CONVERSATION_TAG = "screen-conversation"
@@ -294,7 +294,7 @@ private fun AnswerBody(
     settled: Boolean,
 ) {
     val markwon = rememberMarkwon()
-    val blocks = remember(markdown) { segmentMarkdown(markdown) }
+    val blocks = remember(markdown) { mathMarkdownBlocks(markdown) }
     // `answer-markdown` is the SETTLED-answer contract node (docs/e2e/E6-chat.md): tag it only once the
     // stream has settled, so a test awaiting it does not race mid-stream deltas — the block-math node and
     // the citations arrive on the last delta / `done`. The body still renders incrementally while streaming.
