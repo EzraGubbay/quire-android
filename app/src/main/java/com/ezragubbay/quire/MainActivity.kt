@@ -13,6 +13,7 @@ import com.ezragubbay.quire.feature.auth.PairViewModel
 import com.ezragubbay.quire.feature.settings.SettingsViewModel
 import com.ezragubbay.quire.navigation.AppViewModel
 import com.ezragubbay.quire.navigation.QuireApp
+import com.ezragubbay.quire.push.PushSession
 import com.ezragubbay.quire.sync.SyncCoordinator
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -22,6 +23,8 @@ const val APP_ROOT_TAG = "app-root"
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var syncCoordinator: SyncCoordinator
+
+    @Inject lateinit var pushSession: PushSession
 
     private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
     private val appViewModel: AppViewModel by viewModels()
@@ -34,6 +37,8 @@ class MainActivity : ComponentActivity() {
         splash.setKeepOnScreenCondition { !settingsViewModel.loaded.value || appViewModel.signedIn.value == null }
         // Schedule background metadata sync (idempotent) and queue the app-start sync if the last one is stale.
         syncCoordinator.start()
+        // Register for push on every app start (idempotent per process; a no-op when signed out or not configured).
+        pushSession.onAppStart()
         enableEdgeToEdge()
         // A recreated activity keeps its ViewModel, so re-check the stored session on every (re)launch.
         appViewModel.validateSession()
@@ -43,5 +48,11 @@ class MainActivity : ComponentActivity() {
                 QuireApp(appViewModel, pairViewModel)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Notifications may have been allowed or turned off in system settings while away: re-register if so.
+        pushSession.onResume()
     }
 }

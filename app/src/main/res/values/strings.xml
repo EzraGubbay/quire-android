@@ -199,4 +199,30 @@
     <string name="chats_document_badge">Document</string>
     <string name="chats_course_title">Course chats</string>
     <string name="course_ask">Ask</string>
+    <!-- Push notifications (QMOB-E8, ADR 0003) -->
+    <string name="push_channel_files">New course files</string>
+    <string name="push_channel_deadlines">Homework deadlines</string>
+    <string name="push_channel_notes">Study notes</string>
+    <string name="push_channel_system">Quire</string>
+    <string name="push_new_file_typed">New %1$s: %2$s</string>
+    <string name="push_new_file_in">New file in %1$s</string>
+    <string name="push_a_course">a course</string>
+    <plurals name="push_new_files">
+        <item quantity="one">%1$d new file</item>
+        <item quantity="other">%1$d new files</item>
+    </plurals>
+    <string name="push_homework_due_title">Homework %1$s due %2$s</string>
+    <string name="push_due_today">today %1$s</string>
+    <string name="push_due_tomorrow">tomorrow %1$s</string>
+    <string name="push_due_on">%1$s %2$s</string>
+    <string name="push_homework_fallback_body">Open Quire for the details.</string>
+    <string name="push_note_ready_title">Study note ready</string>
+    <string name="push_note_ready_fallback">A new study note is ready in %1$s.</string>
+    <string name="push_note_failed_title">Note synthesis failed</string>
+    <string name="push_note_failed_body">Open Quire on the web to retry.</string>
+    <string name="push_test_title">Quire notifications work</string>
+    <string name="push_test_body">Test sent from your server.</string>
+    <string name="push_permission_title">Get notified about new course files and homework deadlines</string>
+    <string name="push_permission_allow">Allow</string>
+    <string name="push_permission_not_now">Not now</string>
 </resources>

@@ -8,6 +8,7 @@ import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
+import com.ezragubbay.quire.push.PushSession
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ private const val REVOKE_TIMEOUT_MS = 5_000L
  * Root routing state and session lifecycle. [signedIn] is `null` until the persisted session is read (the splash
  * waits), then signed-in or not. The session ends three ways: a `401` anywhere ([SessionEvents.expired]), a `401`
  * from the launch validation ([validateSession]) — both flag [sessionExpired] so Pair explains why — or a
- * deliberate [signOut] (no message).
+ * deliberate [signOut] (no message). Push follows the session (ADR 0003 §4.2): pairing registers, sign-out deletes the
+ * registration before revoking the token, and any end of session drops the local FCM token.
  */
 @HiltViewModel
 class AppViewModel
@@ -33,6 +35,7 @@ class AppViewModel
         events: SessionEvents,
         private val tokenCache: TokenCache,
         private val client: QuireClient,
+        private val push: PushSession,
     ) : ViewModel() {
         private val _signedIn = MutableStateFlow<Boolean?>(null)
         val signedIn: StateFlow<Boolean?> = _signedIn.asStateFlow()
@@ -72,15 +75,22 @@ class AppViewModel
                 }
         }
 
-        /** Revokes the device token (best effort), clears the session and routes to Pair without a message. */
+        /**
+         * Deletes the push registration and revokes the device token (best effort, one timeout for both, in that
+         * order), clears the session, drops the local FCM token and routes to Pair without a message.
+         */
         fun signOut(): Job =
             viewModelScope.launch {
                 signingOut = true
                 try {
                     validation?.cancel()
-                    withTimeoutOrNull(REVOKE_TIMEOUT_MS) { client.revokeToken() }
+                    withTimeoutOrNull(REVOKE_TIMEOUT_MS) {
+                        push.unregisterRemote()
+                        client.revokeToken()
+                    }
                     sessions.signOut()
                     tokenCache.invalidate()
+                    push.onSignedOut()
                     _sessionExpired.value = false
                     _signedIn.value = false
                 } finally {
@@ -92,6 +102,7 @@ class AppViewModel
         fun onSignedIn() {
             _sessionExpired.value = false
             _signedIn.value = true
+            push.onSignedIn()
         }
 
         /** The Pair screen has taken the expiry message. */
@@ -103,6 +114,8 @@ class AppViewModel
             if (signingOut || _signedIn.value != true) return
             sessions.signOut()
             tokenCache.invalidate()
+            // The server already deleted the registration with the token; only the local half remains.
+            push.onSignedOut()
             _sessionExpired.value = true
             _signedIn.value = false
         }
