@@ -2,6 +2,7 @@ import com.ezragubbay.quire.buildlogic.SigningConfigResolver
 import com.ezragubbay.quire.buildlogic.SigningResolution
 import com.ezragubbay.quire.buildlogic.TrackedSecretsCheck
 import com.ezragubbay.quire.buildlogic.VersionParser
+import java.time.Duration
 import java.util.Properties
 
 plugins {
@@ -135,6 +136,9 @@ android {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.systemProperty("versionPropertiesPath", versionPropertiesFile.absolutePath)
+            // A hung test must name itself and fail the task before CI's job timeout cancels it silently.
+            it.testLogging { events("started", "failed") }
+            it.timeout.set(Duration.ofMinutes(12))
         }
     }
 

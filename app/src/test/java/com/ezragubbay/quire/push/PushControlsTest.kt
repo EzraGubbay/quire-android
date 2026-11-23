@@ -14,6 +14,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -117,7 +118,7 @@ class PushControlsTest {
     @Test
     fun aFlipDuringAnInFlightPut_sendsASecondPutWithTheLatestCategories() =
         runBlocking {
-            server.enqueue(fixtureResponse("putPushRegistration.200.json").setBodyDelay(1, TimeUnit.SECONDS))
+            server.enqueue(fixtureResponse("putPushRegistration.200.json").setBodyDelay(3, TimeUnit.SECONDS))
             server.enqueue(fixtureResponse("putPushRegistration.200.json"))
             val controls = controls()
 
@@ -138,7 +139,9 @@ class PushControlsTest {
 
             controls.setCategory(PushCategory.Files, enabled = false)
 
-            assertFalse(store.preferences.first { !it.isEnabled(PushCategory.Files) }.isEnabled(PushCategory.Files))
+            // Bounded: a swallowed DataStore failure must fail the test, not hang the run.
+            val stored = withTimeout(5_000) { store.preferences.first { !it.isEnabled(PushCategory.Files) } }
+            assertFalse(stored.isEnabled(PushCategory.Files))
             noRequestWithinTwoDebounces()
             assertEquals(0, server.requestCount)
         }
