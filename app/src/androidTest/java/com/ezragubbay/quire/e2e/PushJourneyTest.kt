@@ -269,7 +269,7 @@ class PushJourneyTest {
 
     // --- Preferences: un-ignored by QMOB-E8-S5 (#65) ------------------------------------------------
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S5 (#65)
+    // un-ignored by QMOB-E8-S5 (#65)
     @Test
     fun categoryOff_putsCategories_andSuppressesNotification() {
         seedSignedIn()
@@ -288,7 +288,7 @@ class PushJourneyTest {
         assertTrue(pushNotifications().isEmpty())
     }
 
-    @Ignore("QMOB-E8") // un-ignored by QMOB-E8-S5 (#65)
+    // un-ignored by QMOB-E8-S5 (#65)
     @Test
     fun sendTest_postsTestNotification() {
         seedSignedIn()

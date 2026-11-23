@@ -76,14 +76,21 @@ Shown once on Courses after the first successful pairing, on Android 13+, while 
 
 Reused: `screen-courses`, `screen-course` (E4), `screen-pdf-viewer`, `screen-note-reader` (E5).
 
-### Preferences — placed by QMOB-E8-S5 (#65) (draft; settled by that story)
+### Preferences — placed by QMOB-E8-S5 (#65)
+
+Settings → Notifications, after Sync. Only controls that can work are shown: with the app's notifications off in
+system settings there are no category switches, and the test row shows only while the app may post.
 
 | Tag | Meaning |
 |---|---|
 | `settings-notifications` | Settings → Notifications section. |
-| `setting-push-files` / `setting-push-deadlines` / `setting-push-notes` | Category switches (default on). |
-| `action-send-test-notification` | "Send test notification". |
-| `push-test-result` | The test's outcome (sent / not set up on the server / no registration / rate limited). |
+| `push-unavailable` | The only row when push is not configured in this build ("Push notifications are unavailable in this build"). |
+| `push-system-state` | Shown when the system stands in the way: the permission is missing (Android 13+), or the app's notifications are off in system settings. |
+| `action-push-system-settings` | That row's action: asks for the permission in context (or opens the app's notification settings once the dialog can no longer show), or opens the app's notification settings. |
+| `setting-push-files` / `setting-push-deadlines` / `setting-push-notes` | Category rows: a switch (default on). A channel blocked in system settings says "Blocked in system settings" and has no switch. |
+| `action-push-channel-files` / `-deadlines` / `-notes` | Opens that category's system channel settings. |
+| `action-send-test-notification` | "Send test notification"; disabled ("Sending…") while a test is in flight. |
+| `push-test-result` | The test's outcome: sent / re-registering / try later / not set up on this server / not registered yet / rate limited / unreachable. |
 
 Reused: `action-settings`, `screen-settings` (E2), `action-sign-out`, `screen-pair`, `field-server-url`,
 `field-pair-code`, `action-pair` (E3).
