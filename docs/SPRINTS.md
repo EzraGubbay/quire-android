@@ -143,7 +143,7 @@ Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E
 
 ### v1.1.0 — Sprint 6 — Push Notifications (v1.1.0)
 
-- [ ] Deferred checkpoint passed: Firebase set up by the human (QMOB-E8-S1), ADR 0002 merged, E8 stories specced.
+- [ ] Deferred checkpoint passed: Firebase set up by the human (QMOB-E8-S1), ADR 0003 merged, E8 stories specced.
 - [ ] A real push arrives on the phone and opens the right screen.
 - [ ] **Android is complete — iOS may start.**
 - [ ] Release PR `dev-rc` → `main` green: `build`, `lint`, `unit-tests`, `e2e`.
@@ -152,10 +152,10 @@ Sprint 1 and the later API stories also have milestones in `EzraGubbay/quire` (E
 |---|---|---|---|---|
 | E8-SP | [#61](https://github.com/EzraGubbay/quire-android/issues/61) | Spike: push architecture + event catalogue (FCM) | S | `agent-ready` |
 | E8-S1 | [#62](https://github.com/EzraGubbay/quire-android/issues/62) | Firebase project + credentials (human setup) | XS | `human-only` |
-| E8-S2 | [quire#41](https://github.com/EzraGubbay/quire/issues/41) | Server: device registration + FCM sender (apps/web) | M | `needs-spec` |
-| E8-S3 | [#63](https://github.com/EzraGubbay/quire-android/issues/63) | Android: FCM registration, notification channels, permission | S | `needs-spec` |
-| E8-S4 | [#64](https://github.com/EzraGubbay/quire-android/issues/64) | Notification deep links into course / file / thread | S | `needs-spec` |
-| E8-S5 | [#65](https://github.com/EzraGubbay/quire-android/issues/65) | Notification preferences | XS | `needs-spec` |
+| E8-S2 | [quire#41](https://github.com/EzraGubbay/quire/issues/41) | Server: device registration + FCM sender (apps/web) | M | `agent-ready` |
+| E8-S3 | [#63](https://github.com/EzraGubbay/quire-android/issues/63) | Android: FCM registration, notification channels, permission | S | `agent-ready` |
+| E8-S4 | [#64](https://github.com/EzraGubbay/quire-android/issues/64) | Notification deep links into course / file / thread | S | `agent-ready` |
+| E8-S5 | [#65](https://github.com/EzraGubbay/quire-android/issues/65) | Notification preferences | XS | `agent-ready` |
 
 ## Suggested order inside Sprint 1
 
