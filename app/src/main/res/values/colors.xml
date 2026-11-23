@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Brand primary (matches QuireColors light primary). -->
-    <color name="ic_launcher_background">#2F4B9B</color>
+    <color name="ic_launcher_background">#6E1E2B</color>
     <!-- Splash background = theme background (QuireColors light/dark background). -->
-    <color name="splash_background">#FBF8F3</color>
+    <color name="splash_background">#F6F1E7</color>
 </resources>
