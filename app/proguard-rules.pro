@@ -38,6 +38,13 @@
 # Hilt and Dagger bundle consumer rules; keep WorkManager workers (instantiated by class name) constructible.
 -keep class * extends androidx.work.ListenableWorker { <init>(...); }
 
+# --- JLaTeXMath (Markwon ext-latex) ----------------------------------------------------------------------------
+# Many built-in commands (\dfrac, \tfrac, \operatorname, \textbf, the cases/pmatrix/aligned environments, …) are
+# TeX macros the engine invokes by name: MacroInfo does Class.forName("org.scilab.forge.jlatexmath.NewCommandMacro")
+# and getDeclaredMethod("executeMacro"). R8 renamed the class and removed the method, so every formula using one threw
+# and Markwon drew its raw LaTeX source instead. The library ships no consumer rules; keep the engine as-is.
+-keep class org.scilab.forge.jlatexmath.** { *; }
+
 # --- Logging ---------------------------------------------------------------------------------------------------
 # Strip verbose/debug/info logging from shipped builds, so nothing written for development reaches logcat.
 -assumenosideeffects class android.util.Log {
