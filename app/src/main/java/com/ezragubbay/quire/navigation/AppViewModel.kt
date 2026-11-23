@@ -8,6 +8,8 @@ import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
+import com.ezragubbay.quire.push.PushSession
+import com.ezragubbay.quire.push.PushTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,11 +21,16 @@ import javax.inject.Inject
 
 private const val REVOKE_TIMEOUT_MS = 5_000L
 
+/** The push-registration delete's own share of [REVOKE_TIMEOUT_MS], so the token revoke always gets the rest. */
+private const val PUSH_DELETE_TIMEOUT_MS = 2_000L
+
 /**
  * Root routing state and session lifecycle. [signedIn] is `null` until the persisted session is read (the splash
  * waits), then signed-in or not. The session ends three ways: a `401` anywhere ([SessionEvents.expired]), a `401`
  * from the launch validation ([validateSession]) — both flag [sessionExpired] so Pair explains why — or a
- * deliberate [signOut] (no message).
+ * deliberate [signOut] (no message). Push follows the session (ADR 0003 §4.2): pairing registers, sign-out deletes the
+ * registration before revoking the token, and any end of session drops the local FCM token. A notification tap
+ * ([openFromPush]) waits in [pendingPushTarget] until the signed-in shell consumes it (ADR 0003 §4.5).
  */
 @HiltViewModel
 class AppViewModel
@@ -33,6 +40,7 @@ class AppViewModel
         events: SessionEvents,
         private val tokenCache: TokenCache,
         private val client: QuireClient,
+        private val push: PushSession,
     ) : ViewModel() {
         private val _signedIn = MutableStateFlow<Boolean?>(null)
         val signedIn: StateFlow<Boolean?> = _signedIn.asStateFlow()
@@ -45,6 +53,16 @@ class AppViewModel
         /** Identity of the signed-in device, for Settings. */
         val session: StateFlow<SessionState> = sessions.state
 
+        private val _pendingPushTarget = MutableStateFlow<PushTarget?>(null)
+
+        /**
+         * The tapped notification's target, until the shell navigates to it and calls [onPushTargetConsumed]. Held
+         * while [signedIn] is `null` (the shell is not composed yet); dropped whenever the session is signed out.
+         * Memory only: a target not yet opened is lost on process death (the restored activity never replays the
+         * tap), so the app then reopens where it was.
+         */
+        val pendingPushTarget: StateFlow<PushTarget?> = _pendingPushTarget.asStateFlow()
+
         @Volatile
         private var signingOut = false
 
@@ -54,6 +72,7 @@ class AppViewModel
         init {
             viewModelScope.launch {
                 val signedIn = sessions.current() is SessionState.SignedIn
+                if (!signedIn) _pendingPushTarget.value = null
                 _signedIn.value = signedIn
                 if (signedIn) validateSession()
             }
@@ -72,16 +91,24 @@ class AppViewModel
                 }
         }
 
-        /** Revokes the device token (best effort), clears the session and routes to Pair without a message. */
+        /**
+         * Deletes the push registration and revokes the device token (best effort, one timeout for both, in that
+         * order), clears the session, drops the local FCM token and routes to Pair without a message.
+         */
         fun signOut(): Job =
             viewModelScope.launch {
                 signingOut = true
                 try {
                     validation?.cancel()
-                    withTimeoutOrNull(REVOKE_TIMEOUT_MS) { client.revokeToken() }
+                    withTimeoutOrNull(REVOKE_TIMEOUT_MS) {
+                        withTimeoutOrNull(PUSH_DELETE_TIMEOUT_MS) { push.unregisterRemote() }
+                        client.revokeToken()
+                    }
                     sessions.signOut()
                     tokenCache.invalidate()
+                    push.onSignedOut()
                     _sessionExpired.value = false
+                    _pendingPushTarget.value = null
                     _signedIn.value = false
                 } finally {
                     signingOut = false
@@ -92,6 +119,21 @@ class AppViewModel
         fun onSignedIn() {
             _sessionExpired.value = false
             _signedIn.value = true
+            push.onSignedIn()
+        }
+
+        /**
+         * A notification was tapped (cold start or while running). A newer tap replaces an unconsumed one; while
+         * signed out the tap just opens the app (Pair), so the target is dropped.
+         */
+        fun openFromPush(target: PushTarget) {
+            if (_signedIn.value == false) return
+            _pendingPushTarget.value = target
+        }
+
+        /** The shell navigated to [target]; a newer tap that arrived meanwhile stays pending. */
+        fun onPushTargetConsumed(target: PushTarget) {
+            _pendingPushTarget.compareAndSet(target, null)
         }
 
         /** The Pair screen has taken the expiry message. */
@@ -103,7 +145,10 @@ class AppViewModel
             if (signingOut || _signedIn.value != true) return
             sessions.signOut()
             tokenCache.invalidate()
+            // The server already deleted the registration with the token; only the local half remains.
+            push.onSignedOut()
             _sessionExpired.value = true
+            _pendingPushTarget.value = null
             _signedIn.value = false
         }
     }

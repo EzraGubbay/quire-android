@@ -46,6 +46,20 @@
             </intent-filter>
         </activity>
 
+        <!-- Push (ADR 0003 §4.1): no FCM token exists until the user is signed in; PushRegistrar turns this on. -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+
+        <!-- Receives FCM data messages; only FCM (signature-protected) may start it. -->
+        <service
+            android:name=".push.QuireMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

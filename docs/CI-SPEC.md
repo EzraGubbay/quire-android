@@ -81,6 +81,7 @@ ref, older runs cancelled.
     | E5 reader + downloads | `ReaderJourneyTest` | QMOB-E5-S0 |
     | E6 chat | `ChatJourneyTest` | QMOB-E6-S0 |
     | E7 sync / upload | `SyncJourneyTest` | QMOB-E7-S0 |
+    | E8 push | `PushJourneyTest` | QMOB-E8-S3 |
     | E9 release | `SmokeJourneyTest` on the minified build (added to this job by QMOB-E9-S3) | QMOB-E9-S2 |
 
   - device-only checks: real Keystore round trip, 300-page PDF stress test, process-death restoration.

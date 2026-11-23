@@ -2,6 +2,7 @@ import com.ezragubbay.quire.buildlogic.SigningConfigResolver
 import com.ezragubbay.quire.buildlogic.SigningResolution
 import com.ezragubbay.quire.buildlogic.TrackedSecretsCheck
 import com.ezragubbay.quire.buildlogic.VersionParser
+import java.time.Duration
 import java.util.Properties
 
 plugins {
@@ -15,6 +16,11 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+// Push (ADR 0003 §4.1): google-services.json is never committed. The Google Services plugin is applied only when the
+// file is present (a release build or a local real-push check); every other build compiles with push disabled.
+val pushConfigured = file("google-services.json").isFile
+if (pushConfigured) apply(plugin = "com.google.gms.google-services")
 
 val versionPropertiesFile = rootProject.file("version.properties")
 
@@ -47,6 +53,8 @@ android {
         versionCode = loadVersion().code
         versionName = loadVersion().name
         testInstrumentationRunner = "com.ezragubbay.quire.testing.QuireTestRunner"
+        // True only when app/google-services.json was present at build time; Hilt then binds the Firebase token source.
+        buildConfigField("boolean", "PUSH_CONFIGURED", pushConfigured.toString())
         // Wipe the app's storage after every instrumented test, so no test sees what an earlier one stored. The Room
         // database (reading positions, cached lists, downloads), DataStore, WorkManager and the cache/files dirs
         // otherwise outlive a test: a journey that opened a PDF at a cited page left that file's last-read page
@@ -128,6 +136,9 @@ android {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
             it.systemProperty("versionPropertiesPath", versionPropertiesFile.absolutePath)
+            // A hung test must name itself and fail the task before CI's job timeout cancels it silently.
+            it.testLogging { events("started", "failed") }
+            it.timeout.set(Duration.ofMinutes(12))
         }
     }
 
@@ -220,6 +231,10 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.work.runtime.ktx)
+    // Push (ADR 0003 §4.1): always on the classpath, used only when PUSH_CONFIGURED. No Analytics.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
@@ -250,6 +265,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    // GrantPermissionRule (POST_NOTIFICATIONS) for the E8 push journey.
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestUtil(libs.androidx.test.orchestrator)
     androidTestUtil(libs.androidx.test.services)
     // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).

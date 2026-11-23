@@ -44,7 +44,7 @@ import com.ezragubbay.quire.core.designsystem.theme.ThemeMode
 const val SETTINGS_ACCOUNT_TAG = "settings-account"
 const val ACTION_SIGN_OUT_TAG = "action-sign-out"
 
-/** Settings destination root: Appearance (theme mode, device colors) and About. */
+/** Settings destination root: Appearance (theme mode, device colors), Account, Sync, Notifications and About. */
 @Composable
 fun SettingsScreen(
     account: SessionState.SignedIn? = null,
@@ -52,9 +52,11 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
     syncViewModel: SyncSettingsViewModel = hiltViewModel(),
+    notificationsViewModel: NotificationSettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val sync by syncViewModel.state.collectAsStateWithLifecycle()
+    val notifications by notificationsViewModel.state.collectAsStateWithLifecycle()
     SettingsContent(
         settings = settings,
         onBack = onBack,
@@ -71,6 +73,15 @@ fun SettingsScreen(
                 onSyncNow = syncViewModel::onSyncNow,
                 offline = OfflineActions(syncViewModel::onNotifyChanged, syncViewModel::onCapSelected),
             ),
+        notifications =
+            NotificationActions(
+                state = notifications,
+                onCategoryChanged = notificationsViewModel::onCategoryChanged,
+                onResume = notificationsViewModel::onResume,
+                onPermissionRequested = notificationsViewModel::onPermissionRequested,
+                onPermissionResult = notificationsViewModel::onPermissionResult,
+                onSendTest = notificationsViewModel::onSendTest,
+            ),
     )
 }
 
@@ -85,6 +96,7 @@ fun SettingsContent(
     account: SessionState.SignedIn? = null,
     onSignOut: () -> Unit = {},
     sync: SyncActions? = null,
+    notifications: NotificationActions? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showLicenses by rememberSaveable { mutableStateOf(false) }
@@ -148,6 +160,8 @@ fun SettingsContent(
             if (account != null) AccountSection(account, onSignOut)
 
             if (sync != null) SyncSection(sync)
+
+            if (notifications != null) NotificationsSection(notifications)
 
             SectionHeader(stringResource(R.string.settings_about))
             ListItem(

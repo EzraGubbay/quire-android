@@ -37,6 +37,7 @@ import com.ezragubbay.quire.core.designsystem.component.LoadingSkeleton
 import com.ezragubbay.quire.core.designsystem.component.QuirePullToRefresh
 import com.ezragubbay.quire.core.designsystem.component.SectionHeader
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
+import com.ezragubbay.quire.push.NotificationPermissionCard
 
 /** The Courses tab: semester-grouped course list with pull-to-refresh and loading / empty / error / offline states. */
 @Composable
@@ -49,7 +50,11 @@ fun CoursesScreen(
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.onStart() }
     }
-    CoursesContent(state, onOpenCourse, viewModel::refresh, viewModel::retry)
+    Column(Modifier.fillMaxSize()) {
+        // One-time "allow notifications" card after the first pairing (QMOB-E8-S3); renders nothing otherwise.
+        NotificationPermissionCard()
+        CoursesContent(state, onOpenCourse, viewModel::refresh, viewModel::retry)
+    }
 }
 
 @Composable
