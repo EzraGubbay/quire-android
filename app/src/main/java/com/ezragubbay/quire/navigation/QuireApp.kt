@@ -56,6 +56,7 @@ fun QuireApp(
     val pushTarget by appViewModel.pendingPushTarget.collectAsStateWithLifecycle()
     val expired by appViewModel.sessionExpired.collectAsStateWithLifecycle()
     val account by appViewModel.session.collectAsStateWithLifecycle()
+    val downloadBytes by appViewModel.downloadBytes.collectAsStateWithLifecycle()
     val isSignedIn = signedIn ?: return
     val navController = rememberNavController()
 
@@ -130,6 +131,7 @@ fun QuireApp(
                 AppShell(
                     account = account as? SessionState.SignedIn,
                     onSignOut = appViewModel::signOut,
+                    downloadBytes = downloadBytes,
                     pushTarget = pushTarget,
                     pushTargetResolver = pushTargetResolver,
                     onPushTargetConsumed = appViewModel::onPushTargetConsumed,

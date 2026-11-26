@@ -3,6 +3,7 @@ package com.ezragubbay.quire
 import android.app.Application
 import androidx.work.Configuration
 import androidx.work.DelegatingWorkerFactory
+import com.ezragubbay.quire.core.download.DownloadProgressNotifier
 import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.push.PushChannels
 import com.ezragubbay.quire.push.PushRegistrationWorkerFactory
@@ -20,11 +21,14 @@ class QuireApplication :
 
     @Inject lateinit var pushRegistrationWorkerFactory: PushRegistrationWorkerFactory
 
+    @Inject lateinit var downloadProgressNotifier: DownloadProgressNotifier
+
     override fun onCreate() {
         super.onCreate()
         // Push channels exist from the first launch, so their system settings can be opened before any push arrives.
         // A build without google-services.json can never receive a push, so it shows no empty push channels.
         if (BuildConfig.PUSH_CONFIGURED) PushChannels.ensure(this)
+        downloadProgressNotifier.start()
     }
 
     override val workManagerConfiguration: Configuration

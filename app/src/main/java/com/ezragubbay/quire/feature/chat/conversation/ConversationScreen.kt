@@ -1,5 +1,7 @@
 package com.ezragubbay.quire.feature.chat.conversation
 
+import android.text.Spannable
+import android.text.Spanned
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,11 +41,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -267,8 +272,8 @@ private fun BubbleView(
                 if (isUser) {
                     SelectionContainer { Text(bubble.text, style = MaterialTheme.typography.bodyLarge) }
                 } else {
-                    AnswerBody(bubble.text, settled = !streaming)
-                    AnswerCitations(bubble.text, bubble.citations, onOpenCitation)
+                    AnswerBody(bubble.text, settled = !streaming, bubble.citations, onOpenCitation)
+                    AnswerCitations(bubble.citations, onOpenCitation)
                     if (bubble.stopped) {
                         Text(
                             stringResource(R.string.conversation_stopped),
@@ -292,16 +297,57 @@ private const val USER_WIDTH = 0.85f
 private fun AnswerBody(
     markdown: String,
     settled: Boolean,
+    citations: List<CitationDto>,
+    onOpenCitation: (CitationDto) -> Unit,
 ) {
     val markwon = rememberMarkwon()
     val blocks = remember(markdown) { mathMarkdownBlocks(markdown) }
+    // Plain remember(keys), not derivedStateOf: these are parameters, not State, so there is no read to filter.
+    val byN = remember(citations) { citations.associateBy { it.n } }
+    val scheme = MaterialTheme.colorScheme
+    val style =
+        remember(scheme.secondaryContainer, scheme.onSecondaryContainer, scheme.outline, scheme.onSurfaceVariant) {
+            CitationChipStyle(
+                container = scheme.secondaryContainer.toArgb(),
+                content = scheme.onSecondaryContainer.toArgb(),
+                outline = scheme.outline.toArgb(),
+                unavailableContent = scheme.onSurfaceVariant.toArgb(),
+            )
+        }
+    val unavailable = stringResource(R.string.conversation_source_unavailable)
+    val resources = LocalResources.current
+    val a11yLabel =
+        remember(resources, unavailable) {
+            { c: CitationDto ->
+                val base =
+                    if (c.pageNo == null) {
+                        resources.getString(R.string.conversation_citation_a11y, c.n, c.title)
+                    } else {
+                        resources.getString(R.string.conversation_citation_a11y_page, c.n, c.title, c.pageNo)
+                    }
+                if (c.isOpenable) base else "$base, $unavailable"
+            }
+        }
+    val currentOpen by rememberUpdatedState(onOpenCitation)
+    // Chips only on a settled answer: while streaming (and for stopped/errored partials, which carry no citations)
+    // the text renders exactly as before, with no span churn per delta.
+    val decorate: ((Spanned) -> Spanned)? =
+        remember(settled, byN, style, a11yLabel) {
+            if (settled && byN.isNotEmpty()) {
+                { sp: Spanned ->
+                    (sp as Spannable).applyCitationChips(byN, style, a11yLabel) { currentOpen(it) }
+                }
+            } else {
+                null
+            }
+        }
     // `answer-markdown` is the SETTLED-answer contract node (docs/e2e/E6-chat.md): tag it only once the
     // stream has settled, so a test awaiting it does not race mid-stream deltas — the block-math node and
     // the citations arrive on the last delta / `done`. The body still renders incrementally while streaming.
     Column(Modifier.fillMaxWidth().then(if (settled) Modifier.testTag(ANSWER_MARKDOWN_TAG) else Modifier)) {
         blocks.forEach { block ->
             when (block) {
-                is NoteBlock.Text -> BlockView(markwon, block.markdown, Modifier.fillMaxWidth())
+                is NoteBlock.Text -> BlockView(markwon, block.markdown, Modifier.fillMaxWidth(), transform = decorate)
                 is NoteBlock.Math ->
                     BlockView(
                         markwon = markwon,

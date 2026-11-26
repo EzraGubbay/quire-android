@@ -19,6 +19,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class DownloadRepositoryTest {
@@ -163,5 +164,36 @@ class DownloadRepositoryTest {
             f.delete()
             assertNull(repo.localFile("a"))
             assertNull(repo.localFile("missing"))
+        }
+
+    @Test
+    fun removeUnfinishedKeepsDoneAndDropsTheRestWithTheirFiles() =
+        runBlocking {
+            val done = paths.finalFile("c", "d", "pdf").apply { parentFile!!.mkdirs() }.also { it.writeText("x") }
+            val part = paths.partFile("c", "r", "pdf").also { it.writeText("y") }
+            db.downloadDao().upsert(row("d", DownloadEntity.DONE, 1, 1, done.path))
+            db.downloadDao().upsert(row("r", DownloadEntity.RUNNING, 1, 5))
+            db.downloadDao().upsert(row("q", DownloadEntity.QUEUED, 0, 5))
+            db.downloadDao().upsert(row("f", DownloadEntity.FAILED, 0, 5))
+
+            repo.removeUnfinished()
+
+            assertTrue(scheduler.cancelledAll)
+            assertEquals(listOf("d"), db.downloadDao().getAll().map { it.fileId })
+            assertTrue(done.exists())
+            assertFalse(part.exists())
+        }
+
+    @Test
+    fun purgeAllDeletesOrphanFilesToo() =
+        runBlocking {
+            val orphan = File(paths.root, "c/orphan.pdf").apply { parentFile!!.mkdirs() }.also { it.writeText("z") }
+            db.downloadDao().upsert(row("d", DownloadEntity.DONE, 1, 1))
+
+            repo.purgeAll()
+
+            assertTrue(db.downloadDao().getAll().isEmpty())
+            assertFalse(orphan.exists())
+            assertFalse(paths.root.exists())
         }
 }

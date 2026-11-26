@@ -2,6 +2,7 @@ package com.ezragubbay.quire.feature.notes
 
 import android.content.Context
 import android.graphics.Typeface
+import android.text.Spanned
 import android.util.TypedValue
 import android.widget.TextView
 import androidx.compose.foundation.layout.Box
@@ -131,12 +132,14 @@ private fun NoteBody(blocks: List<NoteBlock>) {
     }
 }
 
+/** [transform], when set, decorates the rendered [Spanned] (e.g. citation chips); null keeps plain `setMarkdown`. */
 @Composable
 internal fun BlockView(
     markwon: Markwon,
     markdown: String,
     modifier: Modifier,
     description: String? = null,
+    transform: ((Spanned) -> Spanned)? = null,
 ) {
     val color = MaterialTheme.colorScheme.onSurface.toArgb()
     val body = MaterialTheme.typography.bodyLarge
@@ -154,7 +157,12 @@ internal fun BlockView(
             if (lineHeightPx > 0f) tv.setLineHeight(lineHeightPx.toInt())
             typeface?.let { tv.typeface = it }
             if (description != null) tv.contentDescription = description
-            markwon.setMarkdown(tv, markdown)
+            if (transform == null) {
+                markwon.setMarkdown(tv, markdown)
+            } else {
+                // Same as setMarkdown (plugin before/afterSetText still run), plus a decorate hook.
+                markwon.setParsedMarkdown(tv, transform(markwon.toMarkdown(markdown)))
+            }
         },
     )
 }
