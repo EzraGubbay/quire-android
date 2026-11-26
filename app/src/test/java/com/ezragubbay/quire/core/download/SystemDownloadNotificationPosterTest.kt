@@ -46,6 +46,7 @@ class SystemDownloadNotificationPosterTest {
         assertEquals(NotificationManager.IMPORTANCE_LOW, channel.importance)
         assertEquals("Downloads", channel.name.toString())
         assertTrue(n.flags and Notification.FLAG_ONGOING_EVENT != 0)
+        assertTrue(n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertEquals(100, n.extras.getInt(Notification.EXTRA_PROGRESS_MAX))
         assertEquals(25, n.extras.getInt(Notification.EXTRA_PROGRESS))
         assertFalse(n.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
@@ -56,7 +57,7 @@ class SystemDownloadNotificationPosterTest {
                 .toString()
                 .contains("2 queued"),
         )
-        assertEquals(STALE_MS, n.timeoutAfter)
+        assertEquals(DOWNLOAD_STALE_MS, n.timeoutAfter)
         assertNotNull(n.contentIntent)
     }
 
@@ -87,6 +88,13 @@ class SystemDownloadNotificationPosterTest {
     @Test
     fun deniedPermissionPostsNothing() {
         shadowOf(app).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        poster.show(summary())
+        assertEquals(0, shadowOf(manager).allNotifications.size)
+    }
+
+    @Test
+    fun appNotificationsBlockedPostsNothing() {
+        shadowOf(manager).setNotificationsEnabled(false)
         poster.show(summary())
         assertEquals(0, shadowOf(manager).allNotifications.size)
     }

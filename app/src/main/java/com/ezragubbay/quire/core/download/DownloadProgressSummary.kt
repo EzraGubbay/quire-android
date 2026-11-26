@@ -16,7 +16,7 @@ data class DownloadProgressSummary(
 }
 
 /** A running row not updated for this long is treated as orphaned (worker stopped, process died). */
-const val STALE_MS = 60_000L
+const val DOWNLOAD_STALE_MS = 60_000L
 
 /**
  * Null when nothing is actively transferring. Only fresh `RUNNING` rows count: the worker bumps `updatedAt` every
@@ -26,7 +26,7 @@ const val STALE_MS = 60_000L
 fun summarize(
     rows: List<DownloadEntity>,
     now: Long,
-    staleMs: Long = STALE_MS,
+    staleMs: Long = DOWNLOAD_STALE_MS,
 ): DownloadProgressSummary? {
     val running = rows.filter { it.state == DownloadEntity.RUNNING && now - it.updatedAt <= staleMs }
     if (running.isEmpty()) return null

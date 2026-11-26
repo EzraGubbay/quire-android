@@ -82,7 +82,7 @@ class DownloadProgressTest {
     /** Regression: a worker that was stopped or killed leaves a RUNNING row that must not pin the notification. */
     @Test
     fun staleRunningRowIsNull() {
-        val stale = row("a", DownloadEntity.RUNNING, progress = 1, updatedAt = now - STALE_MS - 1)
+        val stale = row("a", DownloadEntity.RUNNING, progress = 1, updatedAt = now - DOWNLOAD_STALE_MS - 1)
         assertNull(summarize(listOf(stale), now))
     }
 
@@ -91,7 +91,13 @@ class DownloadProgressTest {
         val s =
             summarize(
                 listOf(
-                    row("a", DownloadEntity.RUNNING, progress = 10, total = 100, updatedAt = now - STALE_MS - 1),
+                    row(
+                        "a",
+                        DownloadEntity.RUNNING,
+                        progress = 10,
+                        total = 100,
+                        updatedAt = now - DOWNLOAD_STALE_MS - 1,
+                    ),
                     row("b", DownloadEntity.RUNNING, progress = 50, total = 100),
                 ),
                 now,

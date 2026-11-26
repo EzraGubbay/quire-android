@@ -26,6 +26,9 @@ const val DOWNLOAD_CHANNEL_ID = "downloads"
 const val DOWNLOAD_NOTIFICATION_ID = 7003
 const val DOWNLOAD_THROTTLE_MS = 500L
 private const val PROGRESS_MAX = 100
+private const val OPEN_FLAGS =
+    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+private const val HEARTBEAT_MS = DOWNLOAD_STALE_MS / 2
 
 /** Shows or clears the download progress notification. A seam so the observer is testable without the system. */
 interface DownloadNotificationPoster {
@@ -93,7 +96,8 @@ internal fun buildDownloadNotification(
         PendingIntent.getActivity(
             context,
             DOWNLOAD_NOTIFICATION_ID,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Intent(context, MainActivity::class.java)
+                .addFlags(OPEN_FLAGS),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
     val percent = summary.percent
@@ -108,7 +112,7 @@ internal fun buildDownloadNotification(
         .setCategory(NotificationCompat.CATEGORY_PROGRESS)
         .setProgress(PROGRESS_MAX, percent ?: 0, percent == null)
         // Safety net: if updates stop (worker killed), the notification removes itself.
-        .setTimeoutAfter(STALE_MS)
+        .setTimeoutAfter(DOWNLOAD_STALE_MS)
         .setContentIntent(open)
         .build()
 }
@@ -126,15 +130,28 @@ class DownloadProgressNotifier(
 ) {
     private val started = AtomicBoolean(false)
 
+    private class Snapshot(
+        val summary: DownloadProgressSummary?,
+        val bucket: Long,
+    )
+
     /** Idempotent. Clears any leftover from a previous process, then follows the table. */
     fun start() {
         if (!started.compareAndSet(false, true)) return
         poster.clear()
         scope.launch {
             rows
-                .map { summarize(it, clock()) }
-                // Byte counts change constantly; only what the user can see (counts, whole percent) re-posts.
-                .distinctUntilChangedBy { it?.let { s -> Triple(s.running, s.queued, s.percent) } }
+                .map {
+                    val now = clock()
+                    Snapshot(summarize(it, now), now / HEARTBEAT_MS)
+                }
+                // Byte counts change constantly; only what the user can see (counts, whole percent) re-posts. The
+                // heartbeat bucket also re-posts a live download at least every HEARTBEAT_MS, so the notification's
+                // own timeout (DOWNLOAD_STALE_MS) never removes one that is still being written; a dead worker
+                // emits nothing, so the timeout still clears it.
+                .distinctUntilChangedBy { snap ->
+                    snap.summary?.let { s -> listOf(s.running, s.queued, s.percent, snap.bucket) }
+                }.map { it.summary }
                 .sample(DOWNLOAD_THROTTLE_MS)
                 .collect { if (it == null) poster.clear() else poster.show(it) }
         }

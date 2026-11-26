@@ -2,9 +2,7 @@ package com.ezragubbay.quire.core.download
 
 import com.ezragubbay.quire.core.database.DownloadEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -29,18 +27,6 @@ class DownloadProgressNotifierTest {
         }
     }
 
-    private val scopes = mutableListOf<TestScope>()
-
-    /** The notifier collects forever (a sample ticker); cancel it so runTest can finish. */
-    private fun test(body: suspend TestScope.() -> Unit) =
-        runTest {
-            try {
-                body()
-            } finally {
-                scopes.forEach { it.cancel() }
-            }
-        }
-
     private fun row(
         state: String,
         progress: Long = 0,
@@ -52,15 +38,14 @@ class DownloadProgressNotifierTest {
     ): Triple<MutableStateFlow<List<DownloadEntity>>, FakePoster, DownloadProgressNotifier> {
         val rows = MutableStateFlow(initial)
         val poster = FakePoster()
-        val scope = TestScope(StandardTestDispatcher(testScheduler))
-        scopes += scope
+        val scope = backgroundScope
         // The clock is frozen at 0 so rows with updatedAt = 0 are always fresh.
         return Triple(rows, poster, DownloadProgressNotifier(rows, poster, scope, clock = { 0L }))
     }
 
     @Test
     fun startClearsFirst() =
-        test {
+        runTest {
             val (_, poster, notifier) = fixture()
             notifier.start()
             assertEquals("clear", poster.events.first())
@@ -68,7 +53,7 @@ class DownloadProgressNotifierTest {
 
     @Test
     fun runningRowShowsSummary() =
-        test {
+        runTest {
             val (rows, poster, notifier) = fixture()
             notifier.start()
             rows.value = listOf(row(DownloadEntity.RUNNING, progress = 500))
@@ -80,13 +65,16 @@ class DownloadProgressNotifierTest {
 
     @Test
     fun burstOfUpdatesInOneWindowPostsOnceWithLatest() =
-        test {
+        runTest {
             val (rows, poster, notifier) = fixture()
             notifier.start()
             runCurrent()
             val before = poster.shown.size
-            for (i in 1..20) rows.value = listOf(row(DownloadEntity.RUNNING, progress = i * 10L))
-            runCurrent()
+            for (i in 1..20) {
+                rows.value = listOf(row(DownloadEntity.RUNNING, progress = i * 10L))
+                advanceTimeBy(20)
+                runCurrent()
+            }
             advanceTimeBy(DOWNLOAD_THROTTLE_MS)
             runCurrent()
             assertTrue(poster.shown.size - before <= 1)
@@ -99,7 +87,7 @@ class DownloadProgressNotifierTest {
 
     @Test
     fun samePercentDoesNotRepost() =
-        test {
+        runTest {
             val (rows, poster, notifier) = fixture()
             notifier.start()
             rows.value = listOf(row(DownloadEntity.RUNNING, progress = 500))
@@ -114,8 +102,28 @@ class DownloadProgressNotifierTest {
         }
 
     @Test
+    fun liveDownloadWithUnchangedPercentReassertsItselfBeforeTheNotificationTimeout() =
+        runTest {
+            var now = 0L
+            val rows = MutableStateFlow(listOf(row(DownloadEntity.RUNNING, progress = 500)))
+            val poster = FakePoster()
+            DownloadProgressNotifier(rows, poster, backgroundScope, clock = { now }).start()
+            advanceTimeBy(DOWNLOAD_THROTTLE_MS + 1)
+            runCurrent()
+            val before = poster.shown.size
+
+            // Same percent, but the worker is alive (the row is rewritten) and half the timeout has passed.
+            now = DOWNLOAD_STALE_MS / 2 + 1
+            rows.value = listOf(row(DownloadEntity.RUNNING, progress = 501).copy(updatedAt = now))
+            advanceTimeBy(DOWNLOAD_THROTTLE_MS + 1)
+            runCurrent()
+
+            assertEquals(before + 1, poster.shown.size)
+        }
+
+    @Test
     fun doneClears() =
-        test {
+        runTest {
             val (rows, poster, notifier) = fixture(listOf(row(DownloadEntity.RUNNING, progress = 1)))
             notifier.start()
             advanceTimeBy(DOWNLOAD_THROTTLE_MS + 1)
@@ -128,7 +136,7 @@ class DownloadProgressNotifierTest {
 
     @Test
     fun removedRowAndRetryBackoffClear() =
-        test {
+        runTest {
             val (rows, poster, notifier) = fixture(listOf(row(DownloadEntity.RUNNING, progress = 1)))
             notifier.start()
             advanceTimeBy(DOWNLOAD_THROTTLE_MS + 1)
@@ -151,7 +159,7 @@ class DownloadProgressNotifierTest {
 
     @Test
     fun startTwiceCollectsOnce() =
-        test {
+        runTest {
             val (rows, poster, notifier) = fixture()
             notifier.start()
             notifier.start()
