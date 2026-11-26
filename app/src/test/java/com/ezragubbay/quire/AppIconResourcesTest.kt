@@ -119,7 +119,8 @@ class AppIconResourcesTest {
     fun splashThemeDefinedInLightAndNight() {
         listOf("values", "values-night").forEach { dir ->
             val style = splashStyle(File(res, "$dir/themes.xml"))
-            assertEquals(dir, "Theme.SplashScreen", style.getAttribute("parent"))
+            // Only the IconBackground variant forwards windowSplashScreenIconBackgroundColor (core-splashscreen 1.0.x).
+            assertEquals(dir, "Theme.SplashScreen.IconBackground", style.getAttribute("parent"))
             val items = itemsByName(style)
             assertEquals(dir, "@color/splash_background", items["windowSplashScreenBackground"])
             assertEquals(dir, "@drawable/ic_quire_logo", items["windowSplashScreenAnimatedIcon"])
@@ -167,11 +168,21 @@ class AppIconResourcesTest {
         val points = mutableListOf<Pair<Double, Double>>()
         var x = 0.0
         var y = 0.0
+        val unsupported = data.filter { it.isLetter() && it !in "MLHVQZ" }
+        assertTrue("unsupported path command(s) '$unsupported' in $data", unsupported.isEmpty())
         Regex("([MLHVQZ])([^MLHVQZ]*)").findAll(data).forEach { token ->
             val nums = Regex("-?\\d*\\.?\\d+").findAll(token.groupValues[2]).map { it.value.toDouble() }.toList()
             when (token.groupValues[1]) {
-                "H" -> nums.forEach { x = it }.also { points += x to y }
-                "V" -> nums.forEach { y = it }.also { points += x to y }
+                "H" ->
+                    nums.forEach {
+                        x = it
+                        points += x to y
+                    }
+                "V" ->
+                    nums.forEach {
+                        y = it
+                        points += x to y
+                    }
                 "M", "L", "Q" ->
                     nums.chunked(2).forEach { (px, py) ->
                         x = px

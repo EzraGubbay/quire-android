@@ -6,7 +6,7 @@
         <item name="android:textColorLink">@color/brand_primary</item>
     </style>
 
-    <style name="Theme.Quire.Starting" parent="Theme.SplashScreen">
+    <style name="Theme.Quire.Starting" parent="Theme.SplashScreen.IconBackground">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_quire_logo</item>
         <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
