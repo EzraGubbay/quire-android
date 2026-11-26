@@ -13,6 +13,7 @@ class FakeUploadQueue : UploadQueue {
     val cancelled = mutableListOf<String>()
     val dismissed = mutableListOf<String>()
     var clearedAll = 0
+    var failClear = false
 
     override fun observe(courseSlug: String): Flow<List<UploadItem>> = items
 
@@ -39,5 +40,6 @@ class FakeUploadQueue : UploadQueue {
 
     override suspend fun clearAll() {
         clearedAll++
+        if (failClear) error("WorkManager is not initialized")
     }
 }

@@ -141,9 +141,9 @@ class UploadRepository(
     override suspend fun dismiss(id: String) = cancel(id)
 
     override suspend fun clearAll() {
-        scheduler.cancelAll()
         dao.deleteAll()
         paths.deleteAll()
+        scheduler.cancelAll()
     }
 
     private suspend fun remove(id: String) {

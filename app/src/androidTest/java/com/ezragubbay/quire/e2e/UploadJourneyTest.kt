@@ -167,12 +167,13 @@ class UploadJourneyTest {
         stubPicker(fixtureFile("lecture-1.pdf"))
 
         composeRule.onNodeWithTag("action-upload-note").performClick()
-        val id = awaitQueuedUpload()
+        // A document upload shows its row on the Files tab, so the Notes tab has no row to wait for.
+        val id = awaitQueuedUpload(rowVisible = false)
 
         enqueueUploadToDone("upload-done-document.json", files = "course-files-uploaded.json")
         meetUploadConstraints(id)
 
-        awaitGone("upload-row-$id")
+        composeRule.waitUntil(TIMEOUT_MS) { runBlocking { db.uploadDao().get(id) } == null }
         val post = server.awaitRequest("name=lecture-1.pdf")
         assertEquals("document", post.requestUrl!!.queryParameter("kind"))
         assertEquals("application/pdf", post.getHeader("Content-Type"))
@@ -240,10 +241,10 @@ class UploadJourneyTest {
     }
 
     /** Waits for the staged upload to be queued in Room and returns its id (the row's test-tag suffix). */
-    private fun awaitQueuedUpload(): String {
+    private fun awaitQueuedUpload(rowVisible: Boolean = true): String {
         composeRule.waitUntil(TIMEOUT_MS) { runBlocking { db.uploadDao().getAll() }.isNotEmpty() }
         val id = runBlocking { db.uploadDao().getAll() }.single().id
-        awaitTag("upload-row-$id")
+        if (rowVisible) awaitTag("upload-row-$id")
         return id
     }
 

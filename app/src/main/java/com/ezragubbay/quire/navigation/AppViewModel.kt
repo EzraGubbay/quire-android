@@ -12,6 +12,7 @@ import com.ezragubbay.quire.core.upload.UploadQueue
 import com.ezragubbay.quire.push.PushSession
 import com.ezragubbay.quire.push.PushTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,7 +108,7 @@ class AppViewModel
                         client.revokeToken()
                     }
                     sessions.signOut()
-                    uploads.clearAll()
+                    clearUploads()
                     tokenCache.invalidate()
                     push.onSignedOut()
                     _sessionExpired.value = false
@@ -144,10 +145,21 @@ class AppViewModel
             _sessionExpired.value = false
         }
 
+        /** Upload cleanup must never keep the user signed in: a failure here is swallowed. */
+        private suspend fun clearUploads() {
+            try {
+                uploads.clearAll()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Best effort: queued rows are also dropped with the app data on uninstall.
+            }
+        }
+
         private suspend fun expire() {
             if (signingOut || _signedIn.value != true) return
             sessions.signOut()
-            uploads.clearAll()
+            clearUploads()
             tokenCache.invalidate()
             // The server already deleted the registration with the token; only the local half remains.
             push.onSignedOut()

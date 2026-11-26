@@ -264,6 +264,21 @@ class AppViewModelTest {
         }
 
     @Test
+    fun aFailingUploadCleanup_doesNotKeepTheUserSignedIn() =
+        runBlocking {
+            signedInSession()
+            uploads.failClear = true
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            vm.signOut().join()
+
+            assertEquals(false, vm.signedIn.value)
+            assertEquals(SessionState.SignedOut, sessions.current())
+        }
+
+    @Test
     fun noticeShown_clearsFlag() =
         runBlocking {
             signedInSession()
