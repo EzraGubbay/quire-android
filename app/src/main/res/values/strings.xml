@@ -153,6 +153,9 @@
     <string name="conversation_history_error">Could not load this conversation.</string>
     <string name="conversation_sources">Sources</string>
     <string name="conversation_source_page">p.</string>
+    <string name="conversation_source_open">Open source</string>
+    <string name="conversation_citation_a11y">Citation %1$d: %2$s</string>
+    <string name="conversation_citation_a11y_page">Citation %1$d: %2$s, page %3$d</string>
     <string name="conversation_source_unavailable">Not available on mobile yet</string>
     <string name="conversation_doc_header">About: %1$s</string>
     <string name="viewer_ask">Ask</string>
