@@ -32,6 +32,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -136,6 +137,8 @@ sealed interface CourseUiState {
         val fileUploads: List<UploadItem> = emptyList(),
         /** Pending and failed Markdown uploads that end up in Notes. */
         val noteUploads: List<UploadItem> = emptyList(),
+        /** Picked files are being copied for upload (a large pick can take a while). */
+        val preparingUpload: Boolean = false,
     ) : CourseUiState
 }
 
@@ -153,6 +156,7 @@ private data class Bundle(
     /** (pinned, cap warning). */
     val pin: Pair<Boolean, Boolean>,
     val uploads: List<UploadItem> = emptyList(),
+    val preparing: Boolean = false,
 )
 
 private fun toUiState(
@@ -208,6 +212,7 @@ private fun toUiState(
         capWarning = bundle.pin.second,
         fileUploads = bundle.uploads.filter { it.target == UploadTarget.DOCUMENT },
         noteUploads = bundle.uploads.filter { it.target == UploadTarget.NOTE },
+        preparingUpload = bundle.preparing,
     )
 }
 
@@ -233,6 +238,9 @@ class CourseViewModel
 
         private val selection = combine(selectedFilter, fileTypes, fileSort) { f, t, s -> Triple(f, t, s) }
 
+        /** True while picked files are being staged for upload. */
+        private val preparing = MutableStateFlow(false)
+
         /** (pinned, cap warning) for this course. */
         private val pinState =
             combine(pins.observePinned(), pins.observeCapWarning()) { pinned, warn ->
@@ -246,11 +254,14 @@ class CourseViewModel
                 source.observeSessions(slug),
                 source.observeFiles(slug),
                 source.observeNotes(slug),
-                combine(selection, pinState, uploads.observe(slug)) { sel, pin, up -> Triple(sel, pin, up) },
-            ) { detail, sessions, files, notes, (sel, pin, up) ->
+                combine(selection, pinState, uploads.observe(slug), preparing) { sel, pin, up, prep ->
+                    Pair(Triple(sel, pin, up), prep)
+                },
+            ) { detail, sessions, files, notes, (core, prep) ->
+                val (sel, pin, up) = core
                 val (selected, types, sort) = sel
                 toUiState(
-                    Bundle(detail, sessions.data, files.data, notes.data, pin, up),
+                    Bundle(detail, sessions.data, files.data, notes.data, pin, up, prep),
                     SessionKind.entries.firstOrNull { it.key == selected },
                     slug,
                     parseSelectedTypes(types),
@@ -269,7 +280,12 @@ class CourseViewModel
             uris: List<Uri>,
         ) {
             viewModelScope.launch {
-                uploads.enqueue(slug, tab, uris).messages().forEach { uploadMessages.trySend(it) }
+                preparing.value = true
+                try {
+                    uploads.enqueue(slug, tab, uris).messages().forEach { uploadMessages.trySend(it) }
+                } finally {
+                    preparing.value = false
+                }
             }
         }
 

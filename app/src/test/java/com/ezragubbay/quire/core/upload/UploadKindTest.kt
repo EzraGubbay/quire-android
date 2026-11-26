@@ -70,6 +70,18 @@ class UploadKindTest {
     }
 
     @Test
+    fun pdfWithNoExtensionAndOpaqueMime_isDetectedByItsMagicBytes() {
+        assertEquals(
+            accepted(UploadFormat.PDF, UploadTarget.DOCUMENT),
+            UploadKind.classify("download", "application/octet-stream", pdfHead, UploadTab.FILES),
+        )
+        assertEquals(
+            Classified.Rejected(UploadRejection.UNSUPPORTED),
+            UploadKind.classify("download", "application/octet-stream", textHead, UploadTab.FILES),
+        )
+    }
+
+    @Test
     fun unsupportedTypes_andMissingName_areRejected() {
         assertEquals(
             Classified.Rejected(UploadRejection.UNSUPPORTED),

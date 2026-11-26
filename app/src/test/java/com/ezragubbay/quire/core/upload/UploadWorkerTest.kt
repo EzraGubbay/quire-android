@@ -16,6 +16,9 @@ import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.UploadApi
 import com.ezragubbay.quire.core.network.UploadJobDto
 import com.ezragubbay.quire.core.network.fixture
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import okhttp3.RequestBody
 import okhttp3.mockwebserver.MockResponse
@@ -35,6 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import retrofit2.Response
 import java.io.IOException
 
+@OptIn(DelicateCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class UploadWorkerTest {
     @get:Rule val tmp = TemporaryFolder()
@@ -112,7 +116,6 @@ class UploadWorkerTest {
                 bytes.size.toLong(),
                 UploadEntity.QUEUED,
                 0,
-                null,
                 null,
                 null,
                 false,
@@ -312,5 +315,90 @@ class UploadWorkerTest {
             assertEquals(1, server.requestCount)
             assertNull(db.uploadDao().get("u1"))
             assertEquals(listOf("c1"), refreshed)
+        }
+
+    @Test
+    fun aRunAttemptCountAtTheCap_failsWithoutPosting_andRetryKeepsTheKey() =
+        runBlocking {
+            seed()
+
+            assertEquals(Result.failure(), worker(deps(), attempt = UploadWorker.MAX_ATTEMPTS).doWork())
+
+            val row = db.uploadDao().get("u1")!!
+            assertEquals(UploadEntity.FAILED, row.state)
+            assertEquals("Upload kept being interrupted; retry on a faster connection", row.error)
+            assertFalse(row.serverFailed)
+            assertEquals(0, server.requestCount)
+        }
+
+    @Test
+    fun aServerJobThatNeverFinishes_isFailedWithAFreshKeyRetry() =
+        runBlocking {
+            seed()
+            val row = db.uploadDao().get("u1")!!
+            db.uploadDao().update(row.copy(serverUploadId = "srv1", state = UploadEntity.PROCESSING))
+
+            assertEquals(Result.failure(), worker(deps(), attempt = UploadWorker.MAX_POLL_RUNS).doWork())
+
+            val after = db.uploadDao().get("u1")!!
+            assertEquals(UploadEntity.FAILED, after.state)
+            assertTrue(after.serverFailed)
+            assertEquals(0, server.requestCount)
+        }
+
+    @Test
+    fun anUnexpectedException_failsTheRow_insteadOfStrandingIt() =
+        runBlocking {
+            seed()
+            val api =
+                object : UploadApi {
+                    override suspend fun create(
+                        courseSlug: String,
+                        idempotencyKey: String,
+                        kind: String,
+                        name: String,
+                        body: RequestBody,
+                    ): Response<UploadJobDto> = error("boom")
+
+                    override suspend fun job(uploadId: String): Response<UploadJobDto> = error("unused")
+                }
+
+            assertEquals(Result.failure(), worker(deps(api)).doWork())
+
+            val row = db.uploadDao().get("u1")!!
+            assertEquals(UploadEntity.FAILED, row.state)
+            assertEquals("Unexpected error: boom", row.error)
+        }
+
+    @Test
+    fun aStoppedUpload_showsAsWaitingAgain() =
+        runBlocking {
+            seed()
+            val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val api =
+                object : UploadApi {
+                    override suspend fun create(
+                        courseSlug: String,
+                        idempotencyKey: String,
+                        kind: String,
+                        name: String,
+                        body: RequestBody,
+                    ): Response<UploadJobDto> {
+                        started.complete(Unit)
+                        kotlinx.coroutines.awaitCancellation()
+                    }
+
+                    override suspend fun job(uploadId: String): Response<UploadJobDto> = error("unused")
+                }
+            val running =
+                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    worker(deps(api)).doWork()
+                }
+            started.await()
+            assertEquals(UploadEntity.UPLOADING, db.uploadDao().get("u1")!!.state)
+
+            running.cancelAndJoin()
+
+            assertEquals(UploadEntity.QUEUED, db.uploadDao().get("u1")!!.state)
         }
 }

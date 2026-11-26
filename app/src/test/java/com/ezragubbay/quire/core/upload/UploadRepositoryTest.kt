@@ -32,11 +32,16 @@ class UploadRepositoryTest {
     private val picked = mutableMapOf<Uri, Pair<UriMeta, ByteArray>>()
     private var ids = 0
 
+    private val stagingThreads = mutableListOf<String>()
+
     private val source =
         object : UriSource {
             override fun query(uri: Uri) = picked.getValue(uri).first
 
-            override fun open(uri: Uri): InputStream = ByteArrayInputStream(picked.getValue(uri).second)
+            override fun open(uri: Uri): InputStream {
+                stagingThreads += Thread.currentThread().name
+                return ByteArrayInputStream(picked.getValue(uri).second)
+            }
         }
 
     @Before
@@ -114,7 +119,9 @@ class UploadRepositoryTest {
             val r = repo()
             r.enqueue("c1", UploadTab.FILES, listOf(pick("a.pdf", pdf)))
             val row = db.uploadDao().get("s0")!!
-            db.uploadDao().update(row.copy(state = UploadEntity.FAILED, error = "Network error", serverUploadId = null))
+            db.uploadDao().update(
+                row.copy(state = UploadEntity.FAILED, error = "Network error", serverUploadId = "srv"),
+            )
             scheduler.enqueued.clear()
 
             r.retry("s0")
@@ -122,6 +129,7 @@ class UploadRepositoryTest {
             val after = db.uploadDao().get("s0")!!
             assertEquals(UploadEntity.QUEUED, after.state)
             assertNull(after.error)
+            assertNull("the same key is POSTed again", after.serverUploadId)
             assertEquals(listOf("s0"), scheduler.enqueued)
         }
 
@@ -202,5 +210,30 @@ class UploadRepositoryTest {
 
             assertEquals(listOf("a.pdf"), items.map { it.displayName })
             assertEquals(UploadItem.State.QUEUED, items.single().state)
+        }
+
+    @Test
+    fun staging_doesNotRunOnTheCallersThread() =
+        runBlocking {
+            val caller = Thread.currentThread().name
+
+            repo().enqueue("c1", UploadTab.FILES, listOf(pick("a.pdf", pdf)))
+
+            assertTrue(stagingThreads.isNotEmpty())
+            assertTrue("staged on $stagingThreads, caller $caller", stagingThreads.none { it == caller })
+        }
+
+    @Test
+    fun enqueue_sweepsStagedFilesThatNoRowRefersTo() =
+        runBlocking {
+            val r = repo()
+            r.enqueue("c1", UploadTab.FILES, listOf(pick("a.pdf", pdf)))
+            val kept = paths.staged("s0")
+            val orphan = paths.staged("orphan").also { it.writeBytes(byteArrayOf(1)) }
+
+            r.enqueue("c1", UploadTab.FILES, listOf(pick("b.md", md)))
+
+            assertFalse(orphan.exists())
+            assertTrue("a file with a row survives the sweep", kept.exists())
         }
 }

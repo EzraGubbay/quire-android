@@ -13,6 +13,7 @@ import com.ezragubbay.quire.core.network.UploadApi
 import com.ezragubbay.quire.core.network.UploadJobDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +46,7 @@ class UploadDeps(
  * `done` or `failed`. The Room row is the source of truth. Transient failures (network, 5xx, a job still processing
  * after the poll window) return [Result.retry]; the next run skips the POST once the server accepted the job.
  */
+@Suppress("TooManyFunctions") // one small step per outcome of an upload run
 class UploadWorker(
     context: Context,
     params: WorkerParameters,
@@ -52,20 +54,51 @@ class UploadWorker(
 ) : CoroutineWorker(context, params) {
     private val uploadId = inputData.getString(KEY_UPLOAD_ID).orEmpty()
 
+    @Suppress("TooGenericExceptionCaught") // last resort: an unexpected error fails the row instead of stranding it
     override suspend fun doWork(): Result =
         withContext(Dispatchers.IO) {
             val row = deps.dao.get(uploadId) ?: return@withContext Result.failure()
             try {
-                run(row)
+                guard(row) ?: run(row)
             } catch (e: CancellationException) {
-                throw e // the row keeps its state: the next run resumes (a repeated POST is idempotent)
+                // Stopped (connectivity lost, run limit): show it as waiting again; the next run resumes, and a
+                // repeated POST is idempotent. A cancelled row is already gone, so this is then a no-op.
+                withContext(NonCancellable) {
+                    mutate { if (it.state == UploadEntity.UPLOADING) it.copy(state = UploadEntity.QUEUED) else it }
+                }
+                throw e
             } catch (e: NoServerConfiguredException) {
                 fail(e.message ?: "No server configured")
             } catch (e: InsecureServerException) {
                 fail(e.message ?: "Insecure server")
             } catch (e: IOException) {
                 transient(e.message ?: "Network error")
+            } catch (e: Exception) {
+                // Unexpected (an undecodable body, a quirk): record it, never strand the row.
+                fail(e.message?.let { "Unexpected error: $it" } ?: "Unexpected error")
             }
+        }
+
+    /**
+     * Run limits. A stopped upload (10-minute limit, lost connectivity) re-POSTs from byte 0, so without a cap a
+     * 100 MB file on a slow uplink would loop forever; a server job that never finishes is failed (a retry then
+     * needs a new key).
+     */
+    private suspend fun guard(row: UploadEntity): Result? =
+        when {
+            row.serverUploadId != null && runAttemptCount >= MAX_POLL_RUNS -> {
+                mutate {
+                    it.copy(
+                        state = UploadEntity.FAILED,
+                        error = "The server did not finish processing the file",
+                        serverFailed = true,
+                    )
+                }
+                Result.failure()
+            }
+            row.serverUploadId == null && runAttemptCount >= MAX_ATTEMPTS ->
+                fail("Upload kept being interrupted; retry on a faster connection")
+            else -> null
         }
 
     @Suppress("ReturnCount") // guard clauses: each early return is a terminal outcome
@@ -202,6 +235,9 @@ class UploadWorker(
     companion object {
         const val KEY_UPLOAD_ID = "uploadId"
         const val MAX_ATTEMPTS = 5
+
+        /** Runs after which an accepted-but-unfinished server job is given up on (about 30 minutes of backoff). */
+        const val MAX_POLL_RUNS = 8
         private const val STATUS_DONE = "done"
         private const val STATUS_FAILED = "failed"
         private const val HTTP_BAD_REQUEST = 400

@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -25,6 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
@@ -41,6 +46,7 @@ private val MAX_SECTION_HEIGHT = 240.dp
 fun UploadTabFrame(
     tab: UploadTab,
     uploads: List<UploadItem>,
+    preparing: Boolean,
     onPicked: (List<Uri>) -> Unit,
     onRetry: (String) -> Unit,
     onCancel: (String) -> Unit,
@@ -50,6 +56,7 @@ fun UploadTabFrame(
     val pick = rememberUploadPicker(tab, onPicked)
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
+            if (preparing) PreparingRow()
             if (uploads.isNotEmpty()) UploadSection(uploads, onRetry, onCancel, onDismiss)
             Box(Modifier.weight(1f)) { content() }
         }
@@ -63,6 +70,19 @@ fun UploadTabFrame(
                     .padding(QuireTheme.spacing.md)
                     .testTag(if (tab == UploadTab.FILES) "action-upload-file" else "action-upload-note"),
         )
+    }
+}
+
+@Composable
+private fun PreparingRow() {
+    val spacing = QuireTheme.spacing
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = spacing.md, vertical = spacing.sm).testTag("upload-preparing"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
+        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        Text(stringResource(R.string.upload_preparing), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -113,7 +133,10 @@ private fun UploadRow(
                 stateLabel(item),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("upload-state-${stateTag(item.state)}"),
+                modifier =
+                    Modifier
+                        .semantics { liveRegion = LiveRegionMode.Polite }
+                        .testTag("upload-state-${stateTag(item.state)}"),
             )
             if (item.state == UploadItem.State.UPLOADING && item.sizeBytes > 0) {
                 LinearProgressIndicator(

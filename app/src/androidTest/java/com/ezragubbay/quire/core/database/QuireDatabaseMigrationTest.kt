@@ -30,8 +30,8 @@ class QuireDatabaseMigrationTest {
         val db = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5)
         db.execSQL(
             "INSERT INTO uploads (id, courseSlug, target, format, displayName, localPath, sizeBytes, state, " +
-                "progressBytes, serverUploadId, resultId, error, serverFailed, createdAt, updatedAt) " +
-                "VALUES ('u1', 'c1', 'document', 'pdf', 'a.pdf', '/x', 1, 'QUEUED', 0, NULL, NULL, NULL, 0, 1, 1)",
+                "progressBytes, serverUploadId, error, serverFailed, createdAt, updatedAt) " +
+                "VALUES ('u1', 'c1', 'document', 'pdf', 'a.pdf', '/x', 1, 'QUEUED', 0, NULL, NULL, 0, 1, 1)",
         )
         db.query("SELECT COUNT(*) FROM uploads").use {
             it.moveToFirst()

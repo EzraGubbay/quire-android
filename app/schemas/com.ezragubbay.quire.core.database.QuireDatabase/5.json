@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 5,
-    "identityHash": "03f49cbc9097a4dbc513fcc9710c6a3d",
+    "identityHash": "1df71c250beae047545148580f2a72e3",
     "entities": [
       {
         "tableName": "courses",
@@ -545,7 +545,7 @@
       },
       {
         "tableName": "uploads",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `courseSlug` TEXT NOT NULL, `target` TEXT NOT NULL, `format` TEXT NOT NULL, `displayName` TEXT NOT NULL, `localPath` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `state` TEXT NOT NULL, `progressBytes` INTEGER NOT NULL, `serverUploadId` TEXT, `resultId` TEXT, `error` TEXT, `serverFailed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `courseSlug` TEXT NOT NULL, `target` TEXT NOT NULL, `format` TEXT NOT NULL, `displayName` TEXT NOT NULL, `localPath` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `state` TEXT NOT NULL, `progressBytes` INTEGER NOT NULL, `serverUploadId` TEXT, `error` TEXT, `serverFailed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -607,11 +607,6 @@
             "affinity": "TEXT"
           },
           {
-            "fieldPath": "resultId",
-            "columnName": "resultId",
-            "affinity": "TEXT"
-          },
-          {
             "fieldPath": "error",
             "columnName": "error",
             "affinity": "TEXT"
@@ -656,7 +651,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '03f49cbc9097a4dbc513fcc9710c6a3d')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1df71c250beae047545148580f2a72e3')"
     ]
   }
 }

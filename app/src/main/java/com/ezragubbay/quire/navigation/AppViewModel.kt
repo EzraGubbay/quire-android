@@ -108,8 +108,9 @@ class AppViewModel
          * Deletes the push registration and revokes the device token (best effort, one timeout for both, in that
          * order), clears the session, drops the local FCM token, wipes local account data ([AccountDataCleaner]:
          * course cache, viewer cache and unfinished downloads always; finished downloads and pins only when
-         * [removeDownloads]) and routes to Pair without a message. A cleanup failure never blocks sign-out. A `401`
-         * expiry ([expire]) deliberately wipes nothing: the user did not choose to sign out and usually re-pairs.
+         * [removeDownloads]) and routes to Pair without a message. A cleanup failure never blocks sign-out. The
+         * upload queue is cleared too. A `401` expiry ([expire]) wipes nothing else (the user did not choose to sign
+         * out and usually re-pairs) but also drops the upload queue, which could not be sent without a session.
          */
         fun signOut(removeDownloads: Boolean = false): Job =
             viewModelScope.launch {

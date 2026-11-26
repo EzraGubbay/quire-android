@@ -108,6 +108,7 @@
     <string name="course_files_empty">No files yet</string>
     <string name="course_notes_empty">No notes yet</string>
     <string name="upload_button">Upload</string>
+    <string name="upload_preparing">Preparing\u2026</string>
     <string name="upload_section_title">Uploads</string>
     <string name="upload_state_queued">Waiting for a connection</string>
     <string name="upload_state_uploading">Uploading %1$d%%</string>

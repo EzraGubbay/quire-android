@@ -42,14 +42,16 @@ class UploadSchedulerTest {
     }
 
     @Test
-    fun enqueueTwice_keepsTheFirst() {
+    fun enqueueTwice_replacesTheFirst_soARetryIsNeverSwallowed() {
         val s = WorkManagerUploadScheduler(context)
         s.enqueue("u1")
-        val first = infos("u1").single().id
+        val first = infos("u1").first { it.state == WorkInfo.State.ENQUEUED }.id
 
         s.enqueue("u1")
 
-        assertEquals(first, infos("u1").single().id)
+        val live = infos("u1").filter { it.state == WorkInfo.State.ENQUEUED }
+        assertEquals(1, live.size)
+        assertTrue(live.single().id != first)
     }
 
     @Test

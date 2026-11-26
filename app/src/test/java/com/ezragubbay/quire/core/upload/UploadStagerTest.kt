@@ -131,6 +131,17 @@ class UploadStagerTest {
     }
 
     @Test
+    fun anyOtherProviderException_isRejectedAsUnreadable() {
+        val uri = Uri.parse("content://test/odd")
+        files[uri] = UriMeta("a.pdf", 10, "application/pdf") to { throw SecurityException("grant revoked") }
+
+        assertEquals(
+            StageResult.Rejected("a.pdf", UploadRejection.UNREADABLE),
+            stager().stage(uri, UploadTab.FILES),
+        )
+    }
+
+    @Test
     fun aProviderThatThrows_isRejectedAsUnreadable_withNothingStaged() {
         val uri = Uri.parse("content://test/boom")
         files[uri] = UriMeta("a.pdf", 10, "application/pdf") to { throw IOException("gone") }

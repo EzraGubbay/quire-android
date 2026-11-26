@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -25,6 +26,7 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.ezragubbay.quire.MainActivity
+import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.download.DownloadWorkerFactory
 import com.ezragubbay.quire.core.upload.UploadWorkerFactory
@@ -167,6 +169,11 @@ class UploadJourneyTest {
         stubPicker(fixtureFile("lecture-1.pdf"))
 
         composeRule.onNodeWithTag("action-upload-note").performClick()
+        // The user is told the PDF goes to Documents.
+        val notice = context.getString(R.string.upload_saved_to_documents, "lecture-1.pdf")
+        composeRule.waitUntil(TIMEOUT_MS) {
+            composeRule.onAllNodesWithText(notice).fetchSemanticsNodes().isNotEmpty()
+        }
         // A document upload shows its row on the Files tab, so the Notes tab has no row to wait for.
         val id = awaitQueuedUpload(rowVisible = false)
 

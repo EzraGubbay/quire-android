@@ -84,6 +84,8 @@ object UploadKind {
                 name.endsWith(".md") || name.endsWith(".markdown") -> UploadFormat.MARKDOWN
                 type == "application/pdf" -> UploadFormat.PDF
                 type in MARKDOWN_MIMES -> UploadFormat.MARKDOWN
+                // A provider may report a PDF as an opaque binary with no extension: the magic bytes decide.
+                head.startsWithPdfMagic() -> UploadFormat.PDF
                 else -> return Classified.Rejected(UploadRejection.UNSUPPORTED)
             }
         if (format == UploadFormat.PDF && !head.startsWithPdfMagic()) {

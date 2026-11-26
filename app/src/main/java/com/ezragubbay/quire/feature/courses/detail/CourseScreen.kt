@@ -50,6 +50,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,6 +72,9 @@ import com.ezragubbay.quire.feature.upload.rejectionRes
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+
+/** Space kept clear under the Files/Notes lists (and above snackbars) for the Upload button. */
+private val UPLOAD_FAB_CLEARANCE = 80.dp
 
 private val TABS =
     listOf(
@@ -148,7 +152,7 @@ internal fun CourseContent(
         }
     }
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = UPLOAD_FAB_CLEARANCE)) },
         modifier = Modifier.fillMaxSize().testTag("screen-course").nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             QuireTopBar(
@@ -247,22 +251,31 @@ private fun CourseTabs(
                     UploadTabFrame(
                         UploadTab.FILES,
                         state.fileUploads,
+                        state.preparingUpload,
                         { uploads.onPicked(UploadTab.FILES, it) },
                         uploads.onRetry,
                         uploads.onCancel,
                         uploads.onDismiss,
                     ) {
-                        FilesTab(state.filesView, state.files.isEmpty(), onToggleFileType, onSelectFileSort, onOpenFile)
+                        FilesTab(
+                            state.filesView,
+                            state.files.isEmpty(),
+                            onToggleFileType,
+                            onSelectFileSort,
+                            onOpenFile,
+                            bottomPadding = UPLOAD_FAB_CLEARANCE,
+                        )
                     }
                 else ->
                     UploadTabFrame(
                         UploadTab.NOTES,
                         state.noteUploads,
+                        state.preparingUpload,
                         { uploads.onPicked(UploadTab.NOTES, it) },
                         uploads.onRetry,
                         uploads.onCancel,
                         uploads.onDismiss,
-                    ) { NotesTab(state.notes, onOpenNote) }
+                    ) { NotesTab(state.notes, onOpenNote, UPLOAD_FAB_CLEARANCE) }
             }
         }
     }
@@ -377,6 +390,7 @@ private fun SessionItem(
 private fun NotesTab(
     notes: List<CourseNote>,
     onOpenNote: (String) -> Unit,
+    bottomPadding: Dp = 0.dp,
 ) {
     if (notes.isEmpty()) {
         EmptyState(stringResource(R.string.course_notes_empty), Modifier.testTag("note-list"))
@@ -385,7 +399,7 @@ private fun NotesTab(
     val spacing = QuireTheme.spacing
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("note-list"),
-        contentPadding = PaddingValues(vertical = spacing.sm),
+        contentPadding = PaddingValues(top = spacing.sm, bottom = spacing.sm + bottomPadding),
     ) {
         items(notes, key = { it.id }) { note ->
             Box(Modifier.testTag("note-row-${note.id}")) {

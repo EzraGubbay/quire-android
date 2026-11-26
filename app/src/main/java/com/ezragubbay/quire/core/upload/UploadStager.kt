@@ -85,9 +85,8 @@ class UploadStager(
         val name = meta.displayName?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment ?: "upload"
         return try {
             source.open(uri).use { raw -> stageStream(BufferedInputStream(raw), meta, name, tab) }
-        } catch (_: IOException) {
-            StageResult.Rejected(name, UploadRejection.UNREADABLE)
-        } catch (_: SecurityException) {
+        } catch (_: Exception) {
+            // SecurityException from a revoked grant, or anything else a provider throws: refuse, never crash.
             StageResult.Rejected(name, UploadRejection.UNREADABLE)
         }
     }

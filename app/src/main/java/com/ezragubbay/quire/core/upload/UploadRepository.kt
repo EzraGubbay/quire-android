@@ -3,8 +3,14 @@ package com.ezragubbay.quire.core.upload
 import android.net.Uri
 import com.ezragubbay.quire.core.database.UploadDao
 import com.ezragubbay.quire.core.database.UploadEntity
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
@@ -56,6 +62,7 @@ interface UploadQueue {
     suspend fun clearAll()
 }
 
+@Suppress("LongParameterList") // collaborators plus test seams (clock, ids, dispatcher), all defaulted
 class UploadRepository(
     private val dao: UploadDao,
     private val scheduler: UploadScheduler,
@@ -63,7 +70,12 @@ class UploadRepository(
     private val stager: UploadStager,
     private val clock: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() },
+    /** Staging reads and copies up to 100 MB: it must never run on the caller's (main) thread. */
+    private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : UploadQueue {
+    /** Serialises staging, row swaps and the orphan sweep, so the sweep never deletes a just-staged file. */
+    private val lock = Mutex()
+
     override fun observe(courseSlug: String): Flow<List<UploadItem>> =
         dao.observeForCourse(courseSlug).map { rows -> rows.filter { it.state != UploadEntity.DONE }.map(::toItem) }
 
@@ -71,51 +83,45 @@ class UploadRepository(
         courseSlug: String,
         tab: UploadTab,
         uris: List<Uri>,
-    ): EnqueueResult {
-        val ids = mutableListOf<String>()
-        val rejections = mutableListOf<UploadRejected>()
-        val toDocuments = mutableListOf<String>()
-        for (uri in uris) {
-            when (val staged = stager.stage(uri, tab)) {
-                is StageResult.Rejected -> rejections += UploadRejected(staged.displayName, staged.reason)
-                is StageResult.Staged -> {
-                    val now = clock()
-                    dao.insert(
-                        UploadEntity(
-                            id = staged.id,
-                            courseSlug = courseSlug,
-                            target = staged.target.wire,
-                            format = staged.format.wire,
-                            displayName = staged.displayName,
-                            localPath = staged.file.absolutePath,
-                            sizeBytes = staged.sizeBytes,
-                            state = UploadEntity.QUEUED,
-                            progressBytes = 0,
-                            serverUploadId = null,
-                            resultId = null,
-                            error = null,
-                            serverFailed = false,
-                            createdAt = now,
-                            updatedAt = now,
-                        ),
-                    )
-                    scheduler.enqueue(staged.id)
-                    ids += staged.id
-                    if (staged.savedToDocuments) toDocuments += staged.displayName
+    ): EnqueueResult =
+        // Not cancellable: leaving the screen mid-pick must not strand a staged file without a row.
+        withContext(io + NonCancellable) {
+            lock.withLock {
+                sweepOrphans()
+                val ids = mutableListOf<String>()
+                val rejections = mutableListOf<UploadRejected>()
+                val toDocuments = mutableListOf<String>()
+                for (uri in uris) {
+                    when (val staged = stager.stage(uri, tab)) {
+                        is StageResult.Rejected -> rejections += UploadRejected(staged.displayName, staged.reason)
+                        is StageResult.Staged -> {
+                            insertQueued(courseSlug, staged)
+                            ids += staged.id
+                            if (staged.savedToDocuments) toDocuments += staged.displayName
+                        }
+                    }
                 }
+                EnqueueResult(ids, rejections, toDocuments)
             }
         }
-        return EnqueueResult(ids, rejections, toDocuments)
-    }
 
-    override suspend fun retry(id: String) {
-        val row = dao.get(id)?.takeIf { it.state == UploadEntity.FAILED } ?: return
+    /** Inserts the row and schedules its work; a failed insert deletes the staged copy so nothing is orphaned. */
+    @Suppress("TooGenericExceptionCaught") // cleanup then rethrow: any failure must not leave an orphan
+    private suspend fun insertQueued(
+        courseSlug: String,
+        staged: StageResult.Staged,
+    ) {
         val now = clock()
-        if (row.serverFailed) {
-            // A server-side `failed` job is final for its idempotency key: send the same staged file under a new one.
-            val fresh =
-                row.copy(
-                    id = newId(),
+        try {
+            dao.insert(
+                UploadEntity(
+                    id = staged.id,
+                    courseSlug = courseSlug,
+                    target = staged.target.wire,
+                    format = staged.format.wire,
+                    displayName = staged.displayName,
+                    localPath = staged.file.absolutePath,
+                    sizeBytes = staged.sizeBytes,
                     state = UploadEntity.QUEUED,
                     progressBytes = 0,
                     serverUploadId = null,
@@ -123,33 +129,77 @@ class UploadRepository(
                     serverFailed = false,
                     createdAt = now,
                     updatedAt = now,
+                ),
+            )
+        } catch (e: Exception) {
+            staged.file.delete()
+            throw e
+        }
+        scheduler.enqueue(staged.id)
+    }
+
+    /** Deletes staged files that no row refers to (a process death between copy and insert leaves one behind). */
+    private suspend fun sweepOrphans() {
+        val known = dao.getAll().map { File(it.localPath).absolutePath }.toSet()
+        paths.root.listFiles()?.forEach { if (it.absolutePath !in known) it.delete() }
+    }
+
+    override suspend fun retry(id: String) {
+        lock.withLock {
+            val row = dao.get(id)?.takeIf { it.state == UploadEntity.FAILED } ?: return
+            val now = clock()
+            if (row.serverFailed) {
+                // A server-side `failed` job is final for its idempotency key: resend the staged file under a new one.
+                val fresh =
+                    row.copy(
+                        id = newId(),
+                        state = UploadEntity.QUEUED,
+                        progressBytes = 0,
+                        serverUploadId = null,
+                        error = null,
+                        serverFailed = false,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                dao.delete(row.id)
+                dao.insert(fresh)
+                scheduler.enqueue(fresh.id)
+            } else {
+                // The same key goes out again: a job the server already accepted is simply returned by the POST.
+                dao.update(
+                    row.copy(
+                        state = UploadEntity.QUEUED,
+                        progressBytes = 0,
+                        error = null,
+                        serverUploadId = null,
+                        updatedAt = now,
+                    ),
                 )
-            dao.delete(row.id)
-            dao.insert(fresh)
-            scheduler.enqueue(fresh.id)
-        } else {
-            dao.update(row.copy(state = UploadEntity.QUEUED, progressBytes = 0, error = null, updatedAt = now))
-            scheduler.enqueue(row.id)
+                scheduler.enqueue(row.id)
+            }
         }
     }
 
     override suspend fun cancel(id: String) {
         scheduler.cancel(id)
-        remove(id)
+        lock.withLock {
+            val row = dao.get(id)
+            dao.delete(id)
+            row?.let { withContext(io) { File(it.localPath).delete() } }
+        }
     }
 
     override suspend fun dismiss(id: String) = cancel(id)
 
     override suspend fun clearAll() {
-        dao.deleteAll()
-        paths.deleteAll()
-        scheduler.cancelAll()
-    }
-
-    private suspend fun remove(id: String) {
-        val row = dao.get(id)
-        dao.delete(id)
-        row?.let { File(it.localPath).delete() }
+        try {
+            scheduler.cancelAll()
+        } finally {
+            lock.withLock {
+                dao.deleteAll()
+                withContext(io) { paths.deleteAll() }
+            }
+        }
     }
 
     private fun toItem(row: UploadEntity) =

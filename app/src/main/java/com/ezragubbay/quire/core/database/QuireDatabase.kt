@@ -94,7 +94,7 @@ val MIGRATION_4_5: Migration =
                 "CREATE TABLE IF NOT EXISTS `uploads` (`id` TEXT NOT NULL, `courseSlug` TEXT NOT NULL, " +
                     "`target` TEXT NOT NULL, `format` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
                     "`localPath` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `state` TEXT NOT NULL, " +
-                    "`progressBytes` INTEGER NOT NULL, `serverUploadId` TEXT, `resultId` TEXT, `error` TEXT, " +
+                    "`progressBytes` INTEGER NOT NULL, `serverUploadId` TEXT, `error` TEXT, " +
                     "`serverFailed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
                     "PRIMARY KEY(`id`))",
             )

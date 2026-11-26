@@ -154,8 +154,6 @@ data class UploadEntity(
     val progressBytes: Long,
     /** The server's job id once the POST was accepted; a retry then polls instead of posting again. */
     val serverUploadId: String?,
-    /** The created document / note id once done. */
-    val resultId: String?,
     val error: String?,
     /** The server accepted the job and then reported it `failed`: a Retry needs a new idempotency key. */
     val serverFailed: Boolean,

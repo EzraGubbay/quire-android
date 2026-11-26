@@ -32,8 +32,8 @@ class WorkManagerUploadScheduler(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_SECONDS, TimeUnit.SECONDS)
                 .addTag(TAG)
                 .build()
-        // KEEP: a second tap while one is queued/running is a no-op; a finished or failed one is replaced.
-        work.enqueueUniqueWork(uniqueName(uploadId), ExistingWorkPolicy.KEEP, request)
+        // REPLACE: Retry on a row whose last run is still winding down must not be swallowed by that finishing work.
+        work.enqueueUniqueWork(uniqueName(uploadId), ExistingWorkPolicy.REPLACE, request)
     }
 
     override fun cancel(uploadId: String) {
