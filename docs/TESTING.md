@@ -11,6 +11,15 @@
 Most logic belongs in unit tests; instrumented tests cover UI journeys end to end against fake servers. Tests are
 written first (see `AGENTS.md`).
 
+## JVM unit tests and coroutines
+
+- DataStore, `stateIn` flows and ViewModel collectors in JVM tests run on the `runTest` scheduler (`backgroundScope`, or a
+  scope on `StandardTestDispatcher(testScheduler)`), never on `Dispatchers.IO`/`Default`.
+- Never wait unbounded (`runBlocking { flow.first { ... } }`). Use `runTest(timeout = 30.seconds)` so a lost emission
+  fails fast with a coroutine dump instead of hanging CI (#180, #139).
+- Robolectric runs a plain `android.app.Application` (`robolectric.properties`). A test that needs the real app opts in
+  with `@Config(application = QuireApplication::class)`.
+
 ## Screenshot tests (Roborazzi)
 
 `DesignSystemScreenshotTest` scans every `@Preview` under `core/designsystem` (the component kit through
