@@ -56,4 +56,34 @@ class CitationParserTest {
         assertEquals("Title 1, p. 7", cite(1).sourceLabel("p."))
         assertEquals("Title 1", cite(1, pageNo = null).sourceLabel("p."))
     }
+
+    private fun ranges(text: String) = CitationParser.markerMatches(text).map { it.n to it.range }
+
+    @Test
+    fun markerMatches_everyOccurrenceWithRanges() = assertEquals(listOf(1 to 2..4, 1 to 8..10), ranges("a [1] b [1]"))
+
+    @Test
+    fun markerMatches_adjacentMarkers() = assertEquals(listOf(1 to 0..2, 2 to 3..5), ranges("[1][2]"))
+
+    @Test
+    fun markerMatches_streamingPartials_noMatchUntilClosed() {
+        listOf("slides [1", "slides [", "[12", "[1 ]").forEach { assertEquals(it, emptyList<Any>(), ranges(it)) }
+        assertEquals(listOf(1 to 2..4), ranges("x [1]"))
+        assertEquals(listOf(false, false, true), listOf("x [", "x [1", "x [1]").map { ranges(it).isNotEmpty() })
+    }
+
+    @Test
+    fun markerMatches_edgeCases() {
+        assertEquals(listOf(0, 999), listOf("[0]", "[999]").map { ranges(it).single().first })
+        listOf("[1000]", "[a]", "[]", "[x1]", "[1a]", "[1, 2]", "[^1]").forEach {
+            assertEquals(it, emptyList<Any>(), ranges(it))
+        }
+        assertEquals(listOf(1 to 1..3), ranges("[[1]]"))
+    }
+
+    @Test
+    fun isOpenable_onlyForDocuments() {
+        assertEquals(true, cite(1).isOpenable)
+        listOf("note", "mystery", "").forEach { assertEquals(it, false, cite(1, kind = it).isOpenable) }
+    }
 }

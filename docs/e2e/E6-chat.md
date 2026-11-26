@@ -20,8 +20,9 @@ the gate; streaming cases `waitUntil` the settled answer.
 4. **Stop** cancels an in-flight answer, keeping the partial text.
 5. Assistant answers render **Markdown** and **block math** (the ADR 0002 Markwon approach, shared
    with the notes reader) as their own taggable nodes.
-6. A `[n]` **citation chip** in the answer opens the cited source in the **PDF viewer at the cited
-   page** through the open-file flow; a **Sources** row under the answer lists the cited items.
+6. `[n]` markers render as **inline citation chips** in the answer text. Tapping one opens the source in
+   the **PDF viewer at the cited page** through the open-file flow. The **Sources** list under the answer
+   lists every cited item, and each openable one can be tapped.
 7. Failures are shown in plain words with the right action: a **mid-stream error** keeps the partial
    text and offers **Retry** (retry re-asks the same question — `POST .../messages` carries only
    `question`, there is no retry field — without a duplicate user bubble, and succeeds); **budget
@@ -87,9 +88,9 @@ therefore keys off the error event's **`kind`**, not its `code`: a "budget reach
 | `chat-input` | The composer text field |
 | `action-send` | Send the question (disabled when blank or while streaming) |
 | `action-stop` | Stop the in-flight answer (keeps the partial). **MUST be visible while streaming** and go away once generation ends; the stop case waits for its disappearance as proof generation stopped (so a no-op Stop cannot pass) |
-| `citation-chip-{n}` | Inline tappable `[n]` citation chip; opens the source at its page |
+| `citation-chip-{n}` | Inline `[n]` chip: a span in the answer's Markwon TextView, not a Compose node. The tag is on the first occurrence of each `n` in a message. Drive it with `CitationChipEspresso` (`withCitationChip`/`tapCitationChip`); opens the source at its page |
 | `sources-row` | The Sources row under an answer |
-| `source-row-{n}` | A cited source entry (title + page) in the Sources row |
+| `source-row-{n}` | A cited source entry (title + page) in the Sources row; tappable when the source is a document |
 | `chat-error` | An error state in the conversation (plain-words message) |
 | `action-retry` | Retry a retryable failure; **absent when the failure is terminal** (keyed off the error's `kind:"budget"`, not its `code`) |
 | `action-ask-about-doc` | Viewer top-bar 'Ask about this document' |
