@@ -1,5 +1,6 @@
 package com.ezragubbay.quire.feature.courses.detail
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,11 +12,17 @@ import com.ezragubbay.quire.core.data.course.CourseSession
 import com.ezragubbay.quire.core.data.course.Loaded
 import com.ezragubbay.quire.core.data.course.SyncState
 import com.ezragubbay.quire.core.designsystem.theme.FileType
+import com.ezragubbay.quire.core.upload.UploadItem
+import com.ezragubbay.quire.core.upload.UploadQueue
+import com.ezragubbay.quire.core.upload.UploadTab
+import com.ezragubbay.quire.core.upload.UploadTarget
 import com.ezragubbay.quire.feature.courses.files.FileSort
 import com.ezragubbay.quire.feature.courses.files.FilesView
 import com.ezragubbay.quire.feature.courses.files.buildFilesView
 import com.ezragubbay.quire.feature.courses.files.parseSelectedTypes
 import com.ezragubbay.quire.feature.courses.files.tag
+import com.ezragubbay.quire.feature.upload.UploadMessage
+import com.ezragubbay.quire.feature.upload.messages
 import com.ezragubbay.quire.sync.PinController
 import dagger.Binds
 import dagger.Module
@@ -23,11 +30,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -123,6 +132,10 @@ sealed interface CourseUiState {
         val pinned: Boolean = false,
         /** The storage cap is holding auto-download back. */
         val capWarning: Boolean = false,
+        /** Pending and failed uploads that end up in Documents (the Files tab). */
+        val fileUploads: List<UploadItem> = emptyList(),
+        /** Pending and failed Markdown uploads that end up in Notes. */
+        val noteUploads: List<UploadItem> = emptyList(),
     ) : CourseUiState
 }
 
@@ -139,6 +152,7 @@ private data class Bundle(
     val notes: List<CourseNote>,
     /** (pinned, cap warning). */
     val pin: Pair<Boolean, Boolean>,
+    val uploads: List<UploadItem> = emptyList(),
 )
 
 private fun toUiState(
@@ -192,6 +206,8 @@ private fun toUiState(
         offline = (state as? SyncState.Failed)?.isOffline == true,
         pinned = bundle.pin.first,
         capWarning = bundle.pin.second,
+        fileUploads = bundle.uploads.filter { it.target == UploadTarget.DOCUMENT },
+        noteUploads = bundle.uploads.filter { it.target == UploadTarget.NOTE },
     )
 }
 
@@ -203,6 +219,7 @@ class CourseViewModel
         private val savedState: SavedStateHandle,
         private val source: CourseSource,
         private val pins: PinController,
+        private val uploads: UploadQueue,
     ) : ViewModel() {
         // Type-safe navigation puts the route's `slug` argument in the SavedStateHandle.
         private val slug: String = checkNotNull(savedState["slug"])
@@ -229,17 +246,44 @@ class CourseViewModel
                 source.observeSessions(slug),
                 source.observeFiles(slug),
                 source.observeNotes(slug),
-                combine(selection, pinState) { sel, pin -> sel to pin },
-            ) { detail, sessions, files, notes, (sel, pin) ->
+                combine(selection, pinState, uploads.observe(slug)) { sel, pin, up -> Triple(sel, pin, up) },
+            ) { detail, sessions, files, notes, (sel, pin, up) ->
                 val (selected, types, sort) = sel
                 toUiState(
-                    Bundle(detail, sessions.data, files.data, notes.data, pin),
+                    Bundle(detail, sessions.data, files.data, notes.data, pin, up),
                     SessionKind.entries.firstOrNull { it.key == selected },
                     slug,
                     parseSelectedTypes(types),
                     FileSort.fromKey(sort),
                 )
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MS), CourseUiState.Loading)
+
+        private val uploadMessages = Channel<UploadMessage>(Channel.UNLIMITED)
+
+        /** One-shot notes about picked files (refusals, a PDF that went to Documents); shown as snackbars. */
+        val messages: Flow<UploadMessage> = uploadMessages.receiveAsFlow()
+
+        /** Files picked on [tab]: stage and queue them; refusals come back through [messages]. */
+        fun onPicked(
+            tab: UploadTab,
+            uris: List<Uri>,
+        ) {
+            viewModelScope.launch {
+                uploads.enqueue(slug, tab, uris).messages().forEach { uploadMessages.trySend(it) }
+            }
+        }
+
+        fun retryUpload(id: String) {
+            viewModelScope.launch { uploads.retry(id) }
+        }
+
+        fun cancelUpload(id: String) {
+            viewModelScope.launch { uploads.cancel(id) }
+        }
+
+        fun dismissUpload(id: String) {
+            viewModelScope.launch { uploads.dismiss(id) }
+        }
 
         fun selectSessionFilter(kind: SessionKind) {
             savedState[FILTER_KEY] = kind.key

@@ -11,7 +11,15 @@ import com.ezragubbay.quire.core.data.course.Loaded
 import com.ezragubbay.quire.core.data.course.SyncState
 import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.network.ApiResult
+import com.ezragubbay.quire.core.upload.EnqueueResult
+import com.ezragubbay.quire.core.upload.FakeUploadQueue
+import com.ezragubbay.quire.core.upload.UploadItem
+import com.ezragubbay.quire.core.upload.UploadRejected
+import com.ezragubbay.quire.core.upload.UploadRejection
+import com.ezragubbay.quire.core.upload.UploadTab
+import com.ezragubbay.quire.core.upload.UploadTarget
 import com.ezragubbay.quire.feature.courses.files.FileSort
+import com.ezragubbay.quire.feature.upload.UploadMessage
 import com.ezragubbay.quire.sync.FakePinController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -68,6 +76,7 @@ class CourseViewModelTest {
     }
 
     private val source = FakeSource()
+    private val uploads = FakeUploadQueue()
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -75,7 +84,8 @@ class CourseViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = CourseViewModel(SavedStateHandle(mapOf("slug" to "signals")), source, FakePinController())
+    private fun vm() =
+        CourseViewModel(SavedStateHandle(mapOf("slug" to "signals")), source, FakePinController(), uploads)
 
     private fun TestScope.latest(vm: CourseViewModel): () -> CourseUiState {
         var latest: CourseUiState = vm.state.value
@@ -99,10 +109,65 @@ class CourseViewModelTest {
         }
 
     @Test
+    fun uploads_splitPerTargetIntoState() =
+        runTest {
+            val vm = vm()
+            val ui = latest(vm)
+            source.emit()
+            uploads.items.value =
+                listOf(
+                    upload("d1", UploadTarget.DOCUMENT),
+                    upload("n1", UploadTarget.NOTE),
+                )
+
+            val content = ui() as CourseUiState.Content
+            assertEquals(listOf("d1"), content.fileUploads.map { it.id })
+            assertEquals(listOf("n1"), content.noteUploads.map { it.id })
+        }
+
+    @Test
+    fun onPicked_enqueuesOnTheTabAndEmitsRefusalsAndTheDocumentsNotice() =
+        runTest {
+            val vm = vm()
+            val seen = mutableListOf<UploadMessage>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.messages.collect { seen += it } }
+            uploads.nextResult =
+                EnqueueResult(
+                    enqueuedIds = listOf("a"),
+                    rejections = listOf(UploadRejected("big.md", UploadRejection.MARKDOWN_TOO_LARGE)),
+                    savedToDocuments = listOf("paper.pdf"),
+                )
+
+            vm.onPicked(UploadTab.NOTES, emptyList())
+
+            assertEquals(listOf(Triple("signals", UploadTab.NOTES, emptyList<android.net.Uri>())), uploads.enqueued)
+            assertEquals(
+                listOf(
+                    UploadMessage.Rejected("big.md", UploadRejection.MARKDOWN_TOO_LARGE),
+                    UploadMessage.SavedToDocuments("paper.pdf"),
+                ),
+                seen,
+            )
+        }
+
+    @Test
+    fun retryCancelDismiss_delegateToTheQueue() =
+        runTest {
+            val vm = vm()
+            vm.retryUpload("a")
+            vm.cancelUpload("b")
+            vm.dismissUpload("c")
+
+            assertEquals(listOf("a"), uploads.retried)
+            assertEquals(listOf("b"), uploads.cancelled)
+            assertEquals(listOf("c"), uploads.dismissed)
+        }
+
+    @Test
     fun filesTab_filterAndSortSurviveRecreation() =
         runTest {
             val handle = SavedStateHandle(mapOf("slug" to "signals"))
-            val vm = CourseViewModel(handle, source, FakePinController())
+            val vm = CourseViewModel(handle, source, FakePinController(), uploads)
             val ui = latest(vm)
             source.emit(
                 files =
@@ -118,7 +183,7 @@ class CourseViewModelTest {
             assertEquals(listOf(FileType.RECITATION), view.groups.map { it.type })
             assertEquals(FileSort.TITLE, view.sort)
 
-            val recreated = latest(CourseViewModel(handle, source, FakePinController()))
+            val recreated = latest(CourseViewModel(handle, source, FakePinController(), uploads))
             assertEquals(setOf(FileType.RECITATION), (recreated() as CourseUiState.Content).filesView.selectedTypes)
 
             vm.toggleFileType(FileType.RECITATION)
@@ -268,6 +333,11 @@ class CourseViewModelTest {
             false,
             "2026-11-01T00:00:00Z",
         )
+
+        fun upload(
+            id: String,
+            target: UploadTarget,
+        ) = UploadItem(id, "$id.md", target, UploadItem.State.QUEUED, 0, 10, null)
 
         fun note(id: String) = CourseNote(id, "signals", "slug-$id", "Note $id", "lecture", 1, "2026-11-01T00:00:00Z")
     }

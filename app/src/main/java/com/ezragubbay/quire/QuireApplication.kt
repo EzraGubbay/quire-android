@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.work.Configuration
 import androidx.work.DelegatingWorkerFactory
 import com.ezragubbay.quire.core.download.DownloadWorkerFactory
+import com.ezragubbay.quire.core.upload.UploadWorkerFactory
 import com.ezragubbay.quire.push.PushChannels
 import com.ezragubbay.quire.push.PushRegistrationWorkerFactory
 import com.ezragubbay.quire.sync.SyncWorkerFactory
@@ -17,6 +18,8 @@ class QuireApplication :
     @Inject lateinit var downloadWorkerFactory: DownloadWorkerFactory
 
     @Inject lateinit var syncWorkerFactory: SyncWorkerFactory
+
+    @Inject lateinit var uploadWorkerFactory: UploadWorkerFactory
 
     @Inject lateinit var pushRegistrationWorkerFactory: PushRegistrationWorkerFactory
 
@@ -34,6 +37,7 @@ class QuireApplication :
                 DelegatingWorkerFactory().apply {
                     addFactory(downloadWorkerFactory)
                     addFactory(syncWorkerFactory)
+                    addFactory(uploadWorkerFactory)
                     addFactory(pushRegistrationWorkerFactory)
                 }
             return Configuration.Builder().setWorkerFactory(factory).build()

@@ -131,3 +131,42 @@ data class ThreadEntity(
     val createdAt: String,
     val updatedAt: String,
 )
+
+/**
+ * One queued upload (PDF or Markdown picked on a course's Files or Notes tab). Room is the source of truth; the
+ * worker and repository write it. [id] doubles as the `Idempotency-Key`, so every retry of the same row is safe.
+ * [courseSlug] is deliberately not a foreign key: a course-list refresh must never drop a pending upload.
+ */
+@Entity(tableName = "uploads", indices = [Index("courseSlug")])
+data class UploadEntity(
+    @PrimaryKey val id: String,
+    val courseSlug: String,
+    /** `document` or `note`: the server's `kind` query value. */
+    val target: String,
+    /** `pdf` or `markdown`. */
+    val format: String,
+    val displayName: String,
+    /** Absolute path of the app-private staged copy. */
+    val localPath: String,
+    val sizeBytes: Long,
+    /** One of [QUEUED], [UPLOADING], [PROCESSING], [DONE], [FAILED]. */
+    val state: String,
+    val progressBytes: Long,
+    /** The server's job id once the POST was accepted; a retry then polls instead of posting again. */
+    val serverUploadId: String?,
+    /** The created document / note id once done. */
+    val resultId: String?,
+    val error: String?,
+    /** The server accepted the job and then reported it `failed`: a Retry needs a new idempotency key. */
+    val serverFailed: Boolean,
+    val createdAt: Long,
+    val updatedAt: Long,
+) {
+    companion object {
+        const val QUEUED = "QUEUED"
+        const val UPLOADING = "UPLOADING"
+        const val PROCESSING = "PROCESSING"
+        const val DONE = "DONE"
+        const val FAILED = "FAILED"
+    }
+}

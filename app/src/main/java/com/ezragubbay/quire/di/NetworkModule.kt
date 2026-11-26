@@ -11,6 +11,7 @@ import com.ezragubbay.quire.core.network.ServerConfigProvider
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
 import com.ezragubbay.quire.core.network.TokenProvider
+import com.ezragubbay.quire.core.network.UploadApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,6 +42,24 @@ object NetworkModule {
         events: SessionEvents,
     ): ContentApi =
         QuireClientFactory.contentApi(
+            config = config,
+            tokens = tokens,
+            events = events,
+            options =
+                NetworkOptions(
+                    allowCleartextLocal = BuildConfig.ALLOW_CLEARTEXT_LOCAL,
+                    debugLogging = BuildConfig.DEBUG,
+                ),
+        )
+
+    @Provides
+    @Singleton
+    fun uploadApi(
+        config: ServerConfigProvider,
+        tokens: TokenCache,
+        events: SessionEvents,
+    ): UploadApi =
+        QuireClientFactory.uploadApi(
             config = config,
             tokens = tokens,
             events = events,

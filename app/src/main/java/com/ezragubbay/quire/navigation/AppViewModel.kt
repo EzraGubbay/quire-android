@@ -8,6 +8,7 @@ import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
+import com.ezragubbay.quire.core.upload.UploadQueue
 import com.ezragubbay.quire.push.PushSession
 import com.ezragubbay.quire.push.PushTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,6 +42,7 @@ class AppViewModel
         private val tokenCache: TokenCache,
         private val client: QuireClient,
         private val push: PushSession,
+        private val uploads: UploadQueue,
     ) : ViewModel() {
         private val _signedIn = MutableStateFlow<Boolean?>(null)
         val signedIn: StateFlow<Boolean?> = _signedIn.asStateFlow()
@@ -105,6 +107,7 @@ class AppViewModel
                         client.revokeToken()
                     }
                     sessions.signOut()
+                    uploads.clearAll()
                     tokenCache.invalidate()
                     push.onSignedOut()
                     _sessionExpired.value = false
@@ -144,6 +147,7 @@ class AppViewModel
         private suspend fun expire() {
             if (signingOut || _signedIn.value != true) return
             sessions.signOut()
+            uploads.clearAll()
             tokenCache.invalidate()
             // The server already deleted the registration with the token; only the local half remains.
             push.onSignedOut()
