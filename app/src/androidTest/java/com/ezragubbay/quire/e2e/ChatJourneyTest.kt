@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso.onView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ezragubbay.quire.MainActivity
 import com.ezragubbay.quire.testing.MockWebServerRule
@@ -234,11 +235,12 @@ class ChatJourneyTest {
         composeRule.onNodeWithTag("action-send").performClick()
         awaitTag("answer-markdown")
 
-        // The `[1]` marker is a tappable chip; tapping it opens the cited document in the viewer at its
-        // page (pageNo 4, which must exist in the 5-page deck: the viewer clamps a page past the end to the
+        // The `[1]` marker is an inline chip span in the answer text, tapped with a real touch via Espresso;
+        // tapping it opens the cited document in the viewer at its page (pageNo 4, which must exist in the 5-page deck: the viewer clamps a page past the end to the
         // last one) through the open-file flow, which streams the PDF content on demand.
         server.enqueuePdfFixture(DECK_PDF)
-        composeRule.onNodeWithTag("citation-chip-1").performClick()
+        composeRule.waitForIdle()
+        onView(withCitationChip("citation-chip-1")).perform(tapCitationChip("citation-chip-1"))
         awaitTag("pdf-page-$CITED_PAGE")
         composeRule.onNodeWithTag("screen-pdf-viewer").assertIsDisplayed()
         composeRule.onNodeWithTag("pdf-page-$CITED_PAGE").assertIsDisplayed()
