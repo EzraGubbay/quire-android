@@ -2,6 +2,7 @@ package com.ezragubbay.quire.navigation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ezragubbay.quire.core.data.session.AccountDataCleaner
 import com.ezragubbay.quire.core.data.session.SessionRepository
 import com.ezragubbay.quire.core.data.session.SessionState
 import com.ezragubbay.quire.core.network.ApiResult
@@ -15,13 +16,16 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 private const val REVOKE_TIMEOUT_MS = 5_000L
+private const val STOP_TIMEOUT_MS = 5_000L
 
 /** The push-registration delete's own share of [REVOKE_TIMEOUT_MS], so the token revoke always gets the rest. */
 private const val PUSH_DELETE_TIMEOUT_MS = 2_000L
@@ -34,6 +38,7 @@ private const val PUSH_DELETE_TIMEOUT_MS = 2_000L
  * registration before revoking the token, and any end of session drops the local FCM token. A notification tap
  * ([openFromPush]) waits in [pendingPushTarget] until the signed-in shell consumes it (ADR 0003 §4.5).
  */
+@Suppress("LongParameterList") // one collaborator per session-lifecycle concern, all injected
 @HiltViewModel
 class AppViewModel
     @Inject
@@ -43,6 +48,7 @@ class AppViewModel
         private val tokenCache: TokenCache,
         private val client: QuireClient,
         private val push: PushSession,
+        private val cleaner: AccountDataCleaner,
         private val uploads: UploadQueue,
     ) : ViewModel() {
         private val _signedIn = MutableStateFlow<Boolean?>(null)
@@ -52,6 +58,10 @@ class AppViewModel
 
         /** True after the session was ended by a `401`; the Pair screen shows "signed out, pair again" once. */
         val sessionExpired: StateFlow<Boolean> = _sessionExpired.asStateFlow()
+
+        /** Bytes held by downloads; Settings offers to remove them on sign-out only when this is non-zero. */
+        val downloadBytes: StateFlow<Long> =
+            cleaner.observeDownloadBytes().stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), 0L)
 
         /** Identity of the signed-in device, for Settings. */
         val session: StateFlow<SessionState> = sessions.state
@@ -96,9 +106,12 @@ class AppViewModel
 
         /**
          * Deletes the push registration and revokes the device token (best effort, one timeout for both, in that
-         * order), clears the session, drops the local FCM token and routes to Pair without a message.
+         * order), clears the session, drops the local FCM token, wipes local account data ([AccountDataCleaner]:
+         * course cache, viewer cache and unfinished downloads always; finished downloads and pins only when
+         * [removeDownloads]) and routes to Pair without a message. A cleanup failure never blocks sign-out. A `401`
+         * expiry ([expire]) deliberately wipes nothing: the user did not choose to sign out and usually re-pairs.
          */
-        fun signOut(): Job =
+        fun signOut(removeDownloads: Boolean = false): Job =
             viewModelScope.launch {
                 signingOut = true
                 try {
@@ -111,6 +124,15 @@ class AppViewModel
                     clearUploads()
                     tokenCache.invalidate()
                     push.onSignedOut()
+                    try {
+                        cleaner.clear(removeDownloads)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") _: Exception,
+                    ) {
+                        // Best effort: leftover cache must never keep the user from signing out.
+                    }
                     _sessionExpired.value = false
                     _pendingPushTarget.value = null
                     _signedIn.value = false

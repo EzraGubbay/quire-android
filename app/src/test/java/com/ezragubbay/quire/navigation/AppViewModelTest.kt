@@ -1,6 +1,7 @@
 package com.ezragubbay.quire.navigation
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.ezragubbay.quire.core.data.session.AccountDataCleaner
 import com.ezragubbay.quire.core.data.session.FakeCipher
 import com.ezragubbay.quire.core.data.session.SessionRepository
 import com.ezragubbay.quire.core.data.session.SessionState
@@ -20,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -120,6 +123,29 @@ class AppViewModelTest {
     private val push = FakePush()
     private val uploads = FakeUploadQueue()
 
+    private inner class FakeAccountDataCleaner : AccountDataCleaner {
+        val bytes = MutableStateFlow(0L)
+        val calls = mutableListOf<Boolean>()
+        var failWith: Exception? = null
+
+        /** What the session looked like at the moment of the wipe. */
+        var sessionAtCall: SessionState? = null
+        var signedInAtCall: Boolean? = null
+        var probeSignedIn: () -> Boolean? = { null }
+        var probeSession = false
+
+        override fun observeDownloadBytes(): Flow<Long> = bytes
+
+        override suspend fun clear(removeDownloads: Boolean) {
+            calls += removeDownloads
+            sessionAtCall = if (probeSession) sessions.current() else null
+            signedInAtCall = probeSignedIn()
+            failWith?.let { throw it }
+        }
+    }
+
+    private val cleaner = FakeAccountDataCleaner()
+
     private val api = FakeApi()
     private val events = SessionEvents()
     private var cacheReads = 0
@@ -140,7 +166,7 @@ class AppViewModelTest {
 
     private suspend fun signedInSession() = sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
 
-    private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, uploads)
+    private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
 
     /** A repository whose eager state collection and persistence run on [scope], so a test scheduler can drive them. */
     private fun sessionsOn(
@@ -176,7 +202,7 @@ class AppViewModelTest {
                 sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
                 advanceUntilIdle()
 
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, uploads)
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
                 advanceUntilIdle()
 
                 assertEquals(true, vm.signedIn.value)
@@ -301,7 +327,7 @@ class AppViewModelTest {
                 sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
                 advanceUntilIdle()
 
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, uploads)
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
                 advanceUntilIdle()
 
                 vm.validateSession()
@@ -409,7 +435,7 @@ class AppViewModelTest {
                             awaitCancellation()
                         }
                     }
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), hung, uploads)
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), hung, cleaner, uploads)
                 advanceUntilIdle()
 
                 vm.signOut()
@@ -503,7 +529,7 @@ class AppViewModelTest {
             val sessions = sessionsOn(scope, "held-signed-in")
             sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
             advanceUntilIdle()
-            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, uploads)
+            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
             val target = PushTarget.Note("signals-and-systems", "n1")
 
             assertNull(vm.signedIn.value)
@@ -519,7 +545,7 @@ class AppViewModelTest {
     fun pushTarget_heldWhileRestoring_isDroppedWhenSignedOut() =
         withPausedLaunch { scope ->
             val sessions = sessionsOn(scope, "held-signed-out")
-            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, uploads)
+            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
 
             assertNull(vm.signedIn.value)
             vm.openFromPush(PushTarget.Course("signals-and-systems"))
@@ -567,5 +593,77 @@ class AppViewModelTest {
             vm.signedIn.first { it == false }
 
             assertNull(vm.pendingPushTarget.value)
+        }
+
+    @Test
+    fun signOut_clearsLocalData_afterTheSessionIsCleared_beforeRoutingToPair() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+            cleaner.probeSignedIn = { vm.signedIn.value }
+            cleaner.probeSession = true
+
+            vm.signOut().join()
+
+            assertEquals(listOf(false), cleaner.calls)
+            assertEquals(SessionState.SignedOut, cleaner.sessionAtCall)
+            assertEquals(true, cleaner.signedInAtCall)
+            assertEquals(false, vm.signedIn.value)
+        }
+
+    @Test
+    fun signOut_removeDownloads_passesTheChoiceThrough() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            vm.signOut(removeDownloads = true).join()
+
+            assertEquals(listOf(true), cleaner.calls)
+        }
+
+    @Test
+    fun signOut_whenCleanupThrows_stillSignsOut() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+            cleaner.failWith = IllegalStateException("disk full")
+
+            vm.signOut().join()
+
+            assertEquals(false, vm.signedIn.value)
+            assertEquals(SessionState.SignedOut, sessions.current())
+            assertFalse(vm.sessionExpired.value)
+        }
+
+    /** A 401 expiry is not a deliberate sign-out: the user usually re-pairs, so local data stays. */
+    @Test
+    fun sessionExpiry_doesNotWipeLocalData() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            events.emitExpired()
+            vm.signedIn.first { it == false }
+
+            assertTrue(cleaner.calls.isEmpty())
+        }
+
+    @Test
+    fun downloadBytes_reflectsTheCleanersFlow() =
+        runBlocking {
+            val vm = vm()
+            vm.resolved()
+            cleaner.bytes.value = 2048L
+
+            assertEquals(2048L, vm.downloadBytes.first { it > 0L })
         }
 }

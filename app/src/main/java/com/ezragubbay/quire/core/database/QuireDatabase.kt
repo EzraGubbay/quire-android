@@ -38,6 +38,8 @@ abstract class QuireDatabase : RoomDatabase() {
 
     abstract fun threadDao(): ThreadDao
 
+    abstract fun accountCacheDao(): AccountCacheDao
+
     abstract fun uploadDao(): UploadDao
 
     companion object {
