@@ -1,5 +1,6 @@
 package com.ezragubbay.quire.feature.chat.conversation
 
+import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -25,7 +26,7 @@ data class CitationChipStyle(
 
 private const val TEXT_SCALE = 0.8f
 private const val PAD_X_EM = 0.35f
-private const val STROKE_DP_PX = 2f
+private const val STROKE_DP = 1f
 
 /**
  * Atomic pill drawn in place of a `[n]` marker. The underlying text stays `[n]` (copy/selection unchanged); line
@@ -38,7 +39,15 @@ class CitationChipSpan(
     val style: CitationChipStyle,
     val testTag: String?,
 ) : ReplacementSpan() {
-    private fun scaled(paint: Paint): Paint = Paint(paint).apply { textSize = paint.textSize * TEXT_SCALE }
+    private val textPaint = Paint()
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val rect = RectF()
+
+    private fun scaled(paint: Paint): Paint =
+        textPaint.apply {
+            set(paint)
+            textSize = paint.textSize * TEXT_SCALE
+        }
 
     override fun getSize(
         paint: Paint,
@@ -65,19 +74,23 @@ class CitationChipSpan(
         val small = scaled(paint)
         val label = n.toString()
         val width = getSize(paint, text, start, end, null).toFloat()
-        val rect = RectF(x, top.toFloat() + 1f, x + width, bottom.toFloat() - 1f)
+        // Bounds from the text's own ascent/descent, not the line box, so line-height padding doesn't stretch the pill.
+        val fm = paint.fontMetrics
+        rect.set(x, y + fm.ascent, x + width, y + fm.descent)
         val radius = rect.height() / 2f
         val openable = citation.isOpenable
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+        val stroke = STROKE_DP * Resources.getSystem().displayMetrics.density
         if (openable) {
-            fill.color = style.container
-            canvas.drawRoundRect(rect, radius, radius, fill)
+            fillPaint.style = Paint.Style.FILL
+            fillPaint.color = style.container
+            canvas.drawRoundRect(rect, radius, radius, fillPaint)
         } else {
-            fill.style = Paint.Style.STROKE
-            fill.strokeWidth = STROKE_DP_PX
-            fill.color = style.outline
-            val inset = RectF(rect).apply { inset(STROKE_DP_PX / 2f, STROKE_DP_PX / 2f) }
-            canvas.drawRoundRect(inset, radius, radius, fill)
+            fillPaint.style = Paint.Style.STROKE
+            fillPaint.strokeWidth = stroke
+            fillPaint.color = style.outline
+            rect.inset(stroke / 2f, stroke / 2f)
+            canvas.drawRoundRect(rect, radius, radius, fillPaint)
+            rect.inset(-stroke / 2f, -stroke / 2f)
         }
         small.color = if (openable) style.content else style.unavailableContent
         small.textAlign = Paint.Align.CENTER

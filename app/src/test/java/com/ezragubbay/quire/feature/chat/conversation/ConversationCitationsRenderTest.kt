@@ -4,12 +4,19 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import com.ezragubbay.quire.core.designsystem.theme.QuireColors
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
 import com.ezragubbay.quire.core.designsystem.theme.ThemeMode
 import com.ezragubbay.quire.core.network.CitationDto
@@ -19,6 +26,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import androidx.compose.ui.semantics.Role as SemanticsRole
 
 @RunWith(RobolectricTestRunner::class)
 class ConversationCitationsRenderTest {
@@ -92,14 +100,27 @@ class ConversationCitationsRenderTest {
     @Test
     fun sourcesRows_documentClickable_noteDisabled() {
         show(settled)
-        rule.onNodeWithTag("source-row-1").assertIsEnabled().performClick()
+        rule
+            .onNodeWithTag("source-row-1")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, SemanticsRole.Button))
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick))
+            .assert(
+                SemanticsMatcher("click label is 'Open source'") {
+                    it.config[SemanticsActions.OnClick].label == "Open source"
+                },
+            ).performClick()
         assertEquals(listOf(doc), opened)
-        rule.onNodeWithTag("source-row-2").assertIsNotEnabled()
+        rule.onNodeWithTag("source-row-2").assertIsNotEnabled().assertTextContains("Not available", substring = true)
     }
 
     @Test
     fun darkTheme_chipUsesDarkSecondaryContainer() {
         show(settled, ThemeMode.Dark)
-        assertEquals(0xFF4D2A2F.toInt(), chipSpans().first().style.container)
+        assertEquals(
+            QuireColors.Dark.scheme.secondaryContainer
+                .toArgb(),
+            chipSpans().first().style.container,
+        )
     }
 }

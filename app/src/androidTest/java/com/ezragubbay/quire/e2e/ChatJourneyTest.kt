@@ -235,8 +235,8 @@ class ChatJourneyTest {
         composeRule.onNodeWithTag("action-send").performClick()
         awaitTag("answer-markdown")
 
-        // The `[1]` marker is an inline chip span in the answer text, tapped with a real touch via Espresso; tapping it opens the cited document in the viewer at its
-        // page (pageNo 4, which must exist in the 5-page deck: the viewer clamps a page past the end to the
+        // The `[1]` marker is an inline chip span in the answer text, tapped with a real touch via Espresso;
+        // tapping it opens the cited document in the viewer at its page (pageNo 4, which must exist in the 5-page deck: the viewer clamps a page past the end to the
         // last one) through the open-file flow, which streams the PDF content on demand.
         server.enqueuePdfFixture(DECK_PDF)
         composeRule.waitForIdle()

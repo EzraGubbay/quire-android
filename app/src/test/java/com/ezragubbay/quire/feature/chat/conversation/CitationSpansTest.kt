@@ -14,6 +14,7 @@ import io.noties.markwon.image.AsyncDrawableSpan
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -52,9 +53,9 @@ class CitationSpansTest {
 
     @Test
     fun repeats_onlyFirstCarriesTag() {
-        val c = chips(decorate("[1] then [1]")).sortedBy { 0 }
-        assertEquals(2, c.size)
-        assertEquals(listOf("citation-chip-1", null), c.map { it.testTag }.sortedBy { it == null })
+        val s = decorate("[1] then [1]")
+        val c = chips(s).sortedBy { s.getSpanStart(it) }
+        assertEquals(listOf<String?>("citation-chip-1", null), c.map { it.testTag })
     }
 
     @Test
@@ -70,18 +71,15 @@ class CitationSpansTest {
 
     @Test
     fun inlineMath_noChipOverlapsMath() {
-        val chipCounts =
-            mathMarkdownBlocks("\$\$x[1]\$\$ and [1]").filterIsInstance<NoteBlock.Text>().map { b ->
-                val s = decorate(b.markdown)
-                val math = s.getSpans(0, s.length, AsyncDrawableSpan::class.java)
-                chips(s).forEach { c ->
-                    math.forEach { m ->
-                        assert(s.getSpanEnd(c) <= s.getSpanStart(m) || s.getSpanStart(c) >= s.getSpanEnd(m))
-                    }
-                }
-                chips(s).size
-            }
-        assertEquals(1, chipCounts.sum())
+        val blocks = mathMarkdownBlocks("see \$x[1]\$ and [1]").filterIsInstance<NoteBlock.Text>()
+        val s = decorate(blocks.joinToString("") { it.markdown })
+        val math = s.getSpans(0, s.length, AsyncDrawableSpan::class.java)
+        assertTrue("expected inline math span", math.isNotEmpty())
+        val c = chips(s)
+        assertEquals(1, c.size)
+        math.forEach { m ->
+            assertTrue(s.getSpanEnd(c[0]) <= s.getSpanStart(m) || s.getSpanStart(c[0]) >= s.getSpanEnd(m))
+        }
     }
 
     @Test
