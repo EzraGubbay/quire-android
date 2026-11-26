@@ -118,6 +118,14 @@ class MockWebServerRule(
     }
 
     /**
+     * Queue a `304 Not Modified` for the file-content endpoint: the answer to a conditional `If-None-Match`
+     * revalidation of a cached copy, carrying the [etag] and no body.
+     */
+    fun enqueueNotModified(etag: String = "\"pdf-v1\"") {
+        server.enqueue(MockResponse().setResponseCode(304).setHeader("ETag", etag))
+    }
+
+    /**
      * Queue a `206 Partial Content` response carrying the byte range [start]..[endInclusive] of the
      * binary asset [name], echoing `Content-Range` and the strong [etag] so a resumed/`Range` request
      * (the download-engine resume path, QMOB-E5-S1) can be exercised.

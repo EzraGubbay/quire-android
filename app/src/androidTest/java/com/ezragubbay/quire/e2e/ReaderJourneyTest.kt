@@ -188,6 +188,29 @@ class ReaderJourneyTest {
         composeRule.onNodeWithTag("pdf-page-3").assertIsDisplayed()
     }
 
+    @Test
+    fun pdfViewer_reopenCached_revalidatesWithIfNoneMatch() {
+        enqueueCourses()
+        enqueueCourseDetail()
+        enqueuePdf() // the first open streams the deck to the cache and records its ETag
+        launch()
+        openLectureFile()
+        awaitTag("pdf-page-1")
+        pressBack()
+
+        // Reopening the cached copy revalidates it; the server says it is unchanged (304, no body).
+        server.enqueueNotModified()
+        reopenLectureFile()
+        awaitTag("pdf-page-1")
+
+        assertTrue("The first open is unconditional", takeContentRequest().getHeader("If-None-Match") == null)
+        assertTrue(
+            "The reopen revalidates with the stored ETag",
+            takeContentRequest().getHeader("If-None-Match") == "\"pdf-v1\"",
+        )
+        composeRule.onNodeWithTag("pdf-page-1").assertIsDisplayed()
+    }
+
     // --- Open-file flow (stream-to-cache, download toggle, open-with): QMOB-E5-S3 (#38) ---------
 
     // un-ignored by QMOB-E5-S3 (#38)
