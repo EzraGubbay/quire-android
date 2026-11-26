@@ -184,7 +184,7 @@ class PdfViewerViewModel
                     val start = RenderWindow.initialPage(route.page, positions.lastPage(route.fileId), doc.pageCount)
                     _state.value = ViewerUiState.Ready(doc, start)
                 }.onFailure {
-                    if (source is OpenSource.Stream) local.delete() // a corrupt cache entry must not stick
+                    if (source is OpenSource.Stream) streamer.discard(local) // a corrupt cache entry must not stick
                     _state.value = ViewerUiState.Error
                 }
         }
