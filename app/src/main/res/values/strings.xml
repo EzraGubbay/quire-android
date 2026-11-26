@@ -249,4 +249,8 @@
     <string name="settings_push_test_not_registered">This device isn\'t registered yet</string>
     <string name="settings_push_test_rate_limited">Try again in a moment</string>
     <string name="settings_push_test_unreachable">Couldn\'t reach your server</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="sign_out_dialog_title">Sign out?</string>
+    <string name="sign_out_dialog_body">You\'ll need to pair this device again.</string>
+    <string name="sign_out_remove_downloads">Also remove downloaded files (%s)</string>
 </resources>

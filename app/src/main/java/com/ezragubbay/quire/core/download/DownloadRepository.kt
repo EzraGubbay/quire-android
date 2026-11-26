@@ -13,6 +13,7 @@ import java.io.File
  * Public download API (E5). Room is the source of truth, so every observer survives process death; WorkManager only
  * does the transfer. Inject this in the viewer (#38) and the Downloads tab (#39).
  */
+@Suppress("TooManyFunctions")
 class DownloadRepository(
     private val dao: DownloadDao,
     private val scheduler: DownloadScheduler,
@@ -64,6 +65,24 @@ class DownloadRepository(
         val rows = dao.getAll()
         dao.deleteAll()
         rows.forEach { deleteFiles(it) }
+    }
+
+    /**
+     * Cancels all download work and drops every row that is not [DownloadEntity.DONE] with its partial file; finished
+     * downloads stay. Sign-out uses this so no stale running row outlives the session.
+     */
+    suspend fun removeUnfinished() {
+        scheduler.cancelAll()
+        dao.getAll().filter { it.state != DownloadEntity.DONE }.forEach {
+            dao.delete(it.fileId)
+            deleteFiles(it)
+        }
+    }
+
+    /** [removeAll] plus the whole downloads directory, so files that have no row (orphans) go too. */
+    suspend fun purgeAll() {
+        removeAll()
+        withContext(Dispatchers.IO) { paths.root.deleteRecursively() }
     }
 
     /** Total bytes held by downloads (finished files plus partials). */

@@ -61,6 +61,20 @@ class OfflineSettingsStore(
         }
     }
 
+    /** Forgets every pin, cap pause and auto-download batch (sign-out); keeps the cap size and the notify switch. */
+    suspend fun clearPins() {
+        dataStore.edit { prefs ->
+            prefs.remove(PINNED)
+            prefs.remove(CAP_PAUSED)
+            prefs.remove(PENDING)
+            prefs
+                .asMap()
+                .keys
+                .filter { it.name.startsWith(DONE_PREFIX) }
+                .forEach { prefs.remove(it) }
+        }
+    }
+
     suspend fun setCapBytes(bytes: Long) {
         dataStore.edit { it[CAP_BYTES] = bytes }
     }
@@ -129,6 +143,8 @@ class OfflineSettingsStore(
         val CAP_PAUSED = stringSetPreferencesKey("offline_cap_paused")
         val PENDING = stringSetPreferencesKey("offline_batch_pending")
 
-        fun doneKey(slug: String) = intPreferencesKey("offline_batch_done_$slug")
+        const val DONE_PREFIX = "offline_batch_done_"
+
+        fun doneKey(slug: String) = intPreferencesKey("$DONE_PREFIX$slug")
     }
 }

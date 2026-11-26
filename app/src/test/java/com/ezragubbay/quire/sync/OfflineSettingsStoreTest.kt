@@ -86,4 +86,26 @@ class OfflineSettingsStoreTest {
             assertNull(store.settle("a", "1", true))
         }
     }
+
+    @Test
+    fun clearPins_dropsPinsPausesAndBatches_butKeepsCapAndNotify() =
+        run {
+            store.addPin("a")
+            store.setCapPaused("a", true)
+            store.startBatch("a", listOf("f1", "f2"))
+            store.settle("a", "f1", true)
+            store.setCapBytes(123L)
+            store.setNotify(false)
+
+            store.clearPins()
+
+            val s = store.current()
+            assertEquals(emptySet<String>(), s.pinned)
+            assertEquals(emptySet<String>(), s.capPausedSlugs)
+            assertEquals(123L, s.capBytes)
+            assertEquals(false, s.notify)
+            // The pending batch and done count are gone too: a fresh batch starts from zero.
+            store.startBatch("a", listOf("g1"))
+            assertEquals(1, store.settle("a", "g1", true))
+        }
 }

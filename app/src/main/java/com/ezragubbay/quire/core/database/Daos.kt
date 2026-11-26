@@ -251,3 +251,43 @@ abstract class ThreadDao {
         insertAll(rows)
     }
 }
+
+/**
+ * Account-scoped cache wipe for sign-out (#92). Deliberately leaves `downloads` alone: whether finished downloads
+ * survive is the user's choice, and `clearAllTables()` would orphan their files by dropping the rows.
+ */
+@Dao
+abstract class AccountCacheDao {
+    @Query("DELETE FROM notes")
+    protected abstract suspend fun deleteNotes()
+
+    @Query("DELETE FROM files")
+    protected abstract suspend fun deleteFiles()
+
+    @Query("DELETE FROM sessions")
+    protected abstract suspend fun deleteSessions()
+
+    @Query("DELETE FROM course_counts")
+    protected abstract suspend fun deleteCourseCounts()
+
+    @Query("DELETE FROM courses")
+    protected abstract suspend fun deleteCourses()
+
+    @Query("DELETE FROM threads")
+    protected abstract suspend fun deleteThreads()
+
+    @Query("DELETE FROM reading_positions")
+    protected abstract suspend fun deleteReadingPositions()
+
+    /** Empties the course cache, threads and reading positions in one transaction. */
+    @Transaction
+    open suspend fun clearCourseCache() {
+        deleteNotes()
+        deleteFiles()
+        deleteSessions()
+        deleteCourseCounts()
+        deleteCourses()
+        deleteThreads()
+        deleteReadingPositions()
+    }
+}
