@@ -170,6 +170,7 @@ abstract class SearchDao {
 fun escapeLike(query: String): String = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 @Dao
+@Suppress("TooManyFunctions")
 abstract class DownloadDao {
     @Query("SELECT * FROM downloads WHERE fileId = :fileId")
     abstract fun observe(fileId: String): Flow<DownloadEntity?>
@@ -182,6 +183,10 @@ abstract class DownloadDao {
 
     @Query("SELECT COALESCE(SUM(progressBytes), 0) FROM downloads")
     abstract fun observeStorageBytes(): Flow<Long>
+
+    /** Bytes of finished downloads only (partials of unfinished ones are not "downloaded files"). */
+    @Query("SELECT COALESCE(SUM(progressBytes), 0) FROM downloads WHERE state = 'DONE'")
+    abstract fun observeDoneBytes(): Flow<Long>
 
     @Query("SELECT COALESCE(SUM(progressBytes), 0) FROM downloads")
     abstract suspend fun storageBytes(): Long
@@ -249,5 +254,45 @@ abstract class ThreadDao {
     ) {
         deleteForCourse(slug)
         insertAll(rows)
+    }
+}
+
+/**
+ * Account-scoped cache wipe for sign-out (#92). Deliberately leaves `downloads` alone: whether finished downloads
+ * survive is the user's choice, and `clearAllTables()` would orphan their files by dropping the rows.
+ */
+@Dao
+abstract class AccountCacheDao {
+    @Query("DELETE FROM notes")
+    protected abstract suspend fun deleteNotes()
+
+    @Query("DELETE FROM files")
+    protected abstract suspend fun deleteFiles()
+
+    @Query("DELETE FROM sessions")
+    protected abstract suspend fun deleteSessions()
+
+    @Query("DELETE FROM course_counts")
+    protected abstract suspend fun deleteCourseCounts()
+
+    @Query("DELETE FROM courses")
+    protected abstract suspend fun deleteCourses()
+
+    @Query("DELETE FROM threads")
+    protected abstract suspend fun deleteThreads()
+
+    @Query("DELETE FROM reading_positions")
+    protected abstract suspend fun deleteReadingPositions()
+
+    /** Empties the course cache, threads and reading positions in one transaction. */
+    @Transaction
+    open suspend fun clearCourseCache() {
+        deleteNotes()
+        deleteFiles()
+        deleteSessions()
+        deleteCourseCounts()
+        deleteCourses()
+        deleteThreads()
+        deleteReadingPositions()
     }
 }

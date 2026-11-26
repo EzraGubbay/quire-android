@@ -262,4 +262,8 @@
         <item quantity="one">%d queued</item>
         <item quantity="other">%d queued</item>
     </plurals>
+    <string name="action_cancel">Cancel</string>
+    <string name="sign_out_dialog_title">Sign out?</string>
+    <string name="sign_out_dialog_body">You\'ll need to pair this device again.</string>
+    <string name="sign_out_remove_downloads">Also remove downloaded files (%s)</string>
 </resources>
