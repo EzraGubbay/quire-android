@@ -42,6 +42,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ezragubbay.quire.R
 import com.ezragubbay.quire.core.data.course.CourseFile
@@ -90,6 +91,8 @@ fun FilesTab(
     onToggleType: (FileType) -> Unit,
     onSelectSort: (FileSort) -> Unit,
     onOpenFile: (String) -> Unit,
+    /** Extra space under the list, so a floating button never covers the last row. */
+    bottomPadding: Dp = 0.dp,
 ) {
     if (noFiles) {
         EmptyState(stringResource(R.string.course_files_empty), Modifier.testTag("file-list"))
@@ -104,7 +107,7 @@ fun FilesTab(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().testTag("file-list"),
-                contentPadding = PaddingValues(bottom = spacing.sm),
+                contentPadding = PaddingValues(bottom = spacing.sm + bottomPadding),
             ) {
                 view.groups.forEach { group ->
                     item(key = "group-${group.type.tag}") { GroupHeader(group.type) }

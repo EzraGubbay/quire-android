@@ -271,6 +271,7 @@ dependencies {
     androidTestUtil(libs.androidx.test.services)
     // Espresso 3.7+ is needed on API 36+ emulators (older versions crash in InputManager.getInstance).
     androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.test.espresso.intents)
     androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.room.testing)
     // WorkManager test driver (WorkManagerTestInitHelper / TestDriver) for the E7 sync journey.

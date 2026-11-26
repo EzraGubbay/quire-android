@@ -1,0 +1,18 @@
+[
+  {
+    "id": "0d6f6c3e-4f5a-4b0b-8f0e-9a6b1d2c3e4f",
+    "slug": "lecture-1-notes",
+    "title": "Lecture 1 notes",
+    "session": {
+      "kind": "lecture",
+      "number": 1
+    },
+    "updatedAt": "2026-10-26T12:00:00Z"
+  },
+  {
+    "id": "d4e5f607-8192-4ca3-9d4e-5f6071829304",
+    "slug": "week1",
+    "title": "week1",
+    "updatedAt": "2026-11-27T09:00:00Z"
+  }
+]

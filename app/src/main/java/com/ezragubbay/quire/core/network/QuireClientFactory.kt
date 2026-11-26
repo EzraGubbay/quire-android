@@ -71,6 +71,28 @@ object QuireClientFactory {
             ).build()
             .create(ContentApi::class.java)
 
+    /** Upload client: no overall call timeout (a 100 MB body on a slow link), but writes and reads still time out. */
+    fun uploadApi(
+        config: ServerConfigProvider,
+        tokens: TokenProvider,
+        events: SessionEvents,
+        options: NetworkOptions,
+    ): UploadApi =
+        Retrofit
+            .Builder()
+            .baseUrl(PLACEHOLDER_BASE)
+            .callFactory(
+                okHttpClient(config, tokens, events, options)
+                    .newBuilder()
+                    .callTimeout(0, TimeUnit.MILLISECONDS)
+                    .writeTimeout(UPLOAD_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .build(),
+            ).addConverterFactory(QuireJson.asConverterFactory("application/json".toMediaType()))
+            .build()
+            .create(UploadApi::class.java)
+
+    private const val UPLOAD_WRITE_TIMEOUT_SECONDS = 60L
+
     /**
      * Streaming client for chat answers: no overall call timeout (an answer may take minutes) but a read timeout of
      * [idleMillis], which acts as the idle watchdog: that long without bytes fails the read with an I/O error.

@@ -16,6 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
             DownloadEntity::class,
             ReadingPositionEntity::class,
             ThreadEntity::class,
+            UploadEntity::class,
         ],
     version = QuireDatabase.VERSION,
     exportSchema = true,
@@ -39,8 +40,10 @@ abstract class QuireDatabase : RoomDatabase() {
 
     abstract fun accountCacheDao(): AccountCacheDao
 
+    abstract fun uploadDao(): UploadDao
+
     companion object {
-        const val VERSION = 4
+        const val VERSION = 5
         const val NAME = "quire.db"
     }
 }
@@ -83,5 +86,22 @@ val MIGRATION_3_4: Migration =
         }
     }
 
+/** 4 -> 5: adds the `uploads` table (upload queue, E7). */
+val MIGRATION_4_5: Migration =
+    object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `uploads` (`id` TEXT NOT NULL, `courseSlug` TEXT NOT NULL, " +
+                    "`target` TEXT NOT NULL, `format` TEXT NOT NULL, `displayName` TEXT NOT NULL, " +
+                    "`localPath` TEXT NOT NULL, `sizeBytes` INTEGER NOT NULL, `state` TEXT NOT NULL, " +
+                    "`progressBytes` INTEGER NOT NULL, `serverUploadId` TEXT, `error` TEXT, " +
+                    "`serverFailed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`id`))",
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_uploads_courseSlug` ON `uploads` (`courseSlug`)")
+        }
+    }
+
 /** Every migration between exported schema versions. */
-val ALL_MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+val ALL_MIGRATIONS: Array<Migration> =
+    arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)

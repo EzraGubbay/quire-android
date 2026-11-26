@@ -13,6 +13,7 @@ import com.ezragubbay.quire.core.network.QuireApi
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
+import com.ezragubbay.quire.core.upload.FakeUploadQueue
 import com.ezragubbay.quire.push.PushSession
 import com.ezragubbay.quire.push.PushTarget
 import kotlinx.coroutines.CoroutineScope
@@ -120,6 +121,7 @@ class AppViewModelTest {
     }
 
     private val push = FakePush()
+    private val uploads = FakeUploadQueue()
 
     private inner class FakeAccountDataCleaner : AccountDataCleaner {
         val bytes = MutableStateFlow(0L)
@@ -164,7 +166,7 @@ class AppViewModelTest {
 
     private suspend fun signedInSession() = sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
 
-    private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner)
+    private fun vm() = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
 
     /** A repository whose eager state collection and persistence run on [scope], so a test scheduler can drive them. */
     private fun sessionsOn(
@@ -200,7 +202,7 @@ class AppViewModelTest {
                 sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
                 advanceUntilIdle()
 
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner)
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
                 advanceUntilIdle()
 
                 assertEquals(true, vm.signedIn.value)
@@ -261,6 +263,48 @@ class AppViewModelTest {
         }
 
     @Test
+    fun expiredEvent_clearsTheUploadQueue() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            events.emitExpired()
+            vm.signedIn.first { it == false }
+
+            assertEquals(1, uploads.clearedAll)
+        }
+
+    @Test
+    fun signOut_clearsTheUploadQueue() =
+        runBlocking {
+            signedInSession()
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            vm.signOut().join()
+
+            assertEquals(1, uploads.clearedAll)
+        }
+
+    @Test
+    fun aFailingUploadCleanup_doesNotKeepTheUserSignedIn() =
+        runBlocking {
+            signedInSession()
+            uploads.failClear = true
+            val vm = vm()
+            vm.resolved()
+            vm.validation?.join()
+
+            vm.signOut().join()
+
+            assertEquals(false, vm.signedIn.value)
+            assertEquals(SessionState.SignedOut, sessions.current())
+        }
+
+    @Test
     fun noticeShown_clearsFlag() =
         runBlocking {
             signedInSession()
@@ -283,7 +327,7 @@ class AppViewModelTest {
                 sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
                 advanceUntilIdle()
 
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner)
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
                 advanceUntilIdle()
 
                 vm.validateSession()
@@ -391,7 +435,7 @@ class AppViewModelTest {
                             awaitCancellation()
                         }
                     }
-                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), hung, cleaner)
+                val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), hung, cleaner, uploads)
                 advanceUntilIdle()
 
                 vm.signOut()
@@ -485,7 +529,7 @@ class AppViewModelTest {
             val sessions = sessionsOn(scope, "held-signed-in")
             sessions.signIn("https://q.example.com", "tok", "ezra", "Pixel")
             advanceUntilIdle()
-            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner)
+            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
             val target = PushTarget.Note("signals-and-systems", "n1")
 
             assertNull(vm.signedIn.value)
@@ -501,7 +545,7 @@ class AppViewModelTest {
     fun pushTarget_heldWhileRestoring_isDroppedWhenSignedOut() =
         withPausedLaunch { scope ->
             val sessions = sessionsOn(scope, "held-signed-out")
-            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner)
+            val vm = AppViewModel(sessions, events, tokenCache, QuireClient(api), push, cleaner, uploads)
 
             assertNull(vm.signedIn.value)
             vm.openFromPush(PushTarget.Course("signals-and-systems"))

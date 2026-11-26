@@ -194,18 +194,16 @@ Open questions:
 | E7-S0 | [#50](https://github.com/EzraGubbay/quire-android/issues/50) | Define the E7 e2e journey first (sync): ignored specs + test-tag contract | S | 5 | `agent-ready` | E0-S3 |
 | E7-S1 | [#51](https://github.com/EzraGubbay/quire-android/issues/51) | Background metadata sync (WorkManager periodic) | S | 5 | `agent-ready` | E7-S0, E4-S1, E3-S5 |
 | E7-S2 | [#52](https://github.com/EzraGubbay/quire-android/issues/52) | Offline pinning: auto-download new and changed files for pinned courses | M | 5 | `agent-ready` | E7-S1, E5-S4 |
-| E7-S3 | [#53](https://github.com/EzraGubbay/quire-android/issues/53) | Upload queue engine (background, resumable) | M | 5 | `needs-spec` | E1-S8, E7-S1 |
-| E7-S4 | [#54](https://github.com/EzraGubbay/quire-android/issues/54) | Share to Quire: Android share target → course picker → enqueue | S | 5 | `needs-spec` | E7-S3 |
-| E7-S5 | [#55](https://github.com/EzraGubbay/quire-android/issues/55) | Upload status: queue screen, progress notification, failure recovery | S | 5 | `needs-spec` | E7-S3 |
+| E7-S3 | [#53](https://github.com/EzraGubbay/quire-android/issues/53) | Upload queue engine (background, resumable): PDF and Markdown from the Files and Notes tabs | M | 5 | shipped (#168) | E1-S8, E7-S1 |
+| E7-S4 | [#54](https://github.com/EzraGubbay/quire-android/issues/54) | Share to Quire: Android share target → course picker → `UploadQueue.enqueue` | S | 5 | `agent-ready` | E7-S3 |
+| E7-S5 | [#55](https://github.com/EzraGubbay/quire-android/issues/55) | Upload status: queue screen, progress notification, result notifications (inline per-tab status shipped with #53) | S | 5 | `agent-ready` | E7-S3 |
 
 Open questions:
-- E7-S3: Blocked on the upload contract (QMOB-E1-S8): single streamed request vs chunked, size limit, status model.
-- E7-S3: Which file kinds are accepted from mobile (PDF, PPTX, Keynote, images)?
-- E7-S3: Which classification fields are required at enqueue time (type, session)?
-- E7-S4: Depends on the classification fields decided in QMOB-E1-S8.
+- E7-S3 (answered): single streamed request per file; PDF up to 100 MB, Markdown up to 2 MB; job statuses `queued` / `processing` / `done` / `failed`; kinds are PDF and Markdown only (a Markdown file on the Files tab is a document, on the Notes tab a note; a PDF on the Notes tab is saved to Documents); no classification fields at enqueue (uploads land in the course root).
+- E7-S4: No classification fields are needed (answered by E7-S3); the share target only has to pick a course and call the queue.
 - E7-S4: Multi-file share: one course/type for all, or per-file choice?
 - E7-S4: Maximum size and behaviour on mobile data (ask / Wi-Fi only)?
-- E7-S5: Depends on the status states exposed by QMOB-E1-S8.
+- E7-S5: The status states are known (queued / uploading / processing / failed, plus done); inline per-tab status shipped with E7-S3, so this is the queue screen and notifications.
 - E7-S5: Where does the queue live in the navigation (Downloads tab section vs Settings)?
 
 ## E8 — Push notifications (Firebase) — deferred checkpoint ([#9](https://github.com/EzraGubbay/quire-android/issues/9))

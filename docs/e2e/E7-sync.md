@@ -56,12 +56,14 @@ error envelope is `{ "error": { "code", "message" } }`.
 | `GET /courses/{course}` + `.../sessions` + `.../files` + `.../notes` | `200` each | Per-course metadata; `…/files` is where a newly-added file first appears. |
 | `GET /courses/{course}/files/{fileId}/content?format=pdf` | `200` / `206` (Range) | Pinned auto-download; `Accept-Ranges`, strong `ETag`, `Content-Disposition` (E5 contract). |
 
-### Upload (pending — QMOB-E1-S8 lands first)
+### Upload (shipped — QMOB-E1-S8 + API 1.2.0)
 
-The mobile upload endpoints are **not yet exercised here**. Once the backend upload contract
-(QMOB-E1-S8, async + idempotent) is fixed and mirrored into `androidTest/assets/fixtures/`, the upload
-operations (initiate / status, resumable chunk `PUT`s) get their own fixtures and cases — see
-[Pending: upload journeys](#pending-upload-journeys-qmob-e7-s3s5).
+| Operation | Status | Role |
+|---|---|---|
+| `POST /courses/{course}/uploads?kind=document\|note&name=…` (raw body, `Idempotency-Key`) | `202` | Queue one file: PDF (`application/pdf`) or Markdown (`text/markdown`). PDF and Markdown-on-Files are documents, Markdown-on-Notes is a note. |
+| `GET /uploads/{uploadId}` | `200` | Poll the job: `queued` / `processing` / `done` (`fileId` or `noteId`) / `failed` (`error`). |
+
+Limits: PDF 100 MB, Markdown 2 MB. A server-`failed` job is final for its key, so Retry after it sends a new key.
 
 ## The user journey
 
@@ -77,8 +79,11 @@ operations (initiate / status, resumable chunk `PUT`s) get their own fixtures an
    (`pdf-page-1` renders from disk).
 5. **Storage cap.** When a pin's offline footprint would exceed the configured storage cap,
    `storage-cap-warning` surfaces (the pin is blocked or needs confirmation — QMOB-E7-S2's call).
-6. **Upload (pending).** Share-to-Quire → course picker → background upload queue → upload status. See
-   below; specified once QMOB-E1-S8 is fixed.
+6. **Upload.** The Files and Notes tabs each have an Upload button (`action-upload-file`, `action-upload-note`).
+   The system picker (multi-select) offers PDF and Markdown; the chosen file is copied into app-private storage and
+   queued. A pending or failed upload shows as a row above the list (`upload-row-{id}`) with its state; on `done`
+   the course is refreshed and the new file or note appears. A PDF picked on the Notes tab is saved to Documents
+   (the app says so). Share-to-Quire (#54) and a dedicated queue screen with notifications (#55) are still to come.
 
 ## Test-tag contract
 
@@ -122,24 +127,31 @@ that un-ignores it.
 | `pinnedCourse_autoDownloadsSyncedFile_opensOffline` | QMOB-E7-S2 (#52) |
 | `pinningOverStorageCap_showsWarning` | QMOB-E7-S2 (#52) |
 
-## Pending: upload journeys (QMOB-E7-S3..S5)
+## Upload journeys (QMOB-E7-S3, #53) — `UploadJourneyTest`
 
-These are **not** in `SyncJourneyTest` yet. The backend mobile upload contract (QMOB-E1-S8 — async +
-idempotent) is fixed first; its request/response shapes are then mirrored into
-`androidTest/assets/fixtures/` and these cases are added, each Ignored with reason **`QMOB-E7-upload`**
-(a distinct reason from `QMOB-E7` so the sync epic can close before upload ships, and so the human can
-defer upload per the epic's definition of done). Planned journey and tags (draft — settled when the
-contract lands):
+Live, not ignored. The system picker is stubbed with Espresso-Intents; background work is driven by the WorkManager
+test driver (the upload worker runs once its network constraint is met).
 
-- **Share to Quire (QMOB-E7-S4, #54).** An Android `ACTION_SEND` of a PDF opens a course picker and
-  enqueues an upload. Draft tags: `screen-share-target`, `share-course-picker`, `share-course-{slug}`,
-  `action-enqueue-upload`.
-- **Upload queue engine (QMOB-E7-S3, #53).** Background, resumable, create-only. Verified mostly by its
-  own unit tests (resume, idempotency key); surfaces state to the status screen below.
-- **Upload status (QMOB-E7-S5, #55).** A queue screen with per-item progress, a progress notification,
-  and failure recovery. Draft tags: `screen-uploads`, `upload-row-{id}`, `upload-state-queued`,
-  `upload-state-running`, `upload-state-done`, `upload-state-failed`, `action-retry-upload`,
-  `action-cancel-upload`.
+| Tag | Meaning |
+|---|---|
+| `action-upload-file` | Upload button on the Files tab (PDF or Markdown becomes a document). |
+| `action-upload-note` | Upload button on the Notes tab (Markdown becomes a note; a PDF becomes a document). |
+| `upload-section` | The "Uploads" block above a tab's list (only while something is pending or failed). |
+| `upload-row-{id}` | One queued, running, processing or failed upload (`{id}` is the queue id, also the idempotency key). |
+| `upload-state-queued` / `upload-state-running` / `upload-state-processing` / `upload-state-failed` | The state label inside a row. |
+| `action-retry-upload` | Retry a failed upload (a server-failed one is re-sent under a new key). |
+| `action-cancel-upload` | Cancel a queued, running or processing upload. |
+| `action-dismiss-upload` | Remove a failed upload. |
+
+| Case | Covers |
+|---|---|
+| `pdfFromFilesTab_uploads_andTheNewFileAppears` | Files tab: POST (key, type, kind, name), poll to done, row disappears, new `file-row-{id}`. |
+| `markdownFromNotesTab_uploads_andTheNewNoteAppears` | Notes tab: `kind=note`, new `note-row-{id}`. |
+| `pdfFromNotesTab_isUploadedAsADocument` | A PDF on Notes is sent as `kind=document`, never refused. |
+| `serverFailure_showsTheFailedState_withRetry` | `upload-state-failed` with `action-retry-upload` and `action-dismiss-upload`. |
+
+Still to come: Share-to-Quire (#54: share target, course picker) and the queue screen with progress and result
+notifications (#55).
 
 ## Fixtures
 
@@ -154,5 +166,9 @@ contract lands):
 `course-files-synced.json` is `course-files.json` plus the new `Lecture 2 - Sampling` file
 (`fileId = b2c3d4e5-6f70-4a81-9b2c-3d4e5f607182`); it is served on the post-sync refetch so the new
 `file-row-{fileId}` appears without a manual refresh, and its PDF (`lecture-1.pdf`, via
-`enqueuePdfFixture`) is the body the pinned auto-download streams. Upload fixtures are added with the
-pending upload cases once QMOB-E1-S8 is fixed.
+`enqueuePdfFixture`) is the body the pinned auto-download streams. 
+
+The upload journey adds `upload-accepted.json`, `upload-done-document.json`, `upload-done-note.json`,
+`upload-failed.json` (the job as the server reports it), `course-files-uploaded.json` and
+`course-notes-uploaded.json` (the refetched lists with the new file / note) and `week1.md` (the Markdown the picker
+returns). The picked `file:` URI points at a copy of a fixture in the app cache.

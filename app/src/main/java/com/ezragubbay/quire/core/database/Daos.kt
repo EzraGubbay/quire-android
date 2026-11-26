@@ -257,6 +257,31 @@ abstract class ThreadDao {
     }
 }
 
+@Dao
+abstract class UploadDao {
+    @Query("SELECT * FROM uploads WHERE courseSlug = :slug ORDER BY createdAt, id")
+    abstract fun observeForCourse(slug: String): Flow<List<UploadEntity>>
+
+    @Query("SELECT * FROM uploads WHERE id = :id")
+    abstract suspend fun get(id: String): UploadEntity?
+
+    @Query("SELECT * FROM uploads")
+    abstract suspend fun getAll(): List<UploadEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insert(upload: UploadEntity)
+
+    /** No-ops when the row was removed meanwhile, so a late worker write cannot resurrect a cancelled upload. */
+    @Update
+    abstract suspend fun update(upload: UploadEntity): Int
+
+    @Query("DELETE FROM uploads WHERE id = :id")
+    abstract suspend fun delete(id: String)
+
+    @Query("DELETE FROM uploads")
+    abstract suspend fun deleteAll()
+}
+
 /**
  * Account-scoped cache wipe for sign-out (#92). Deliberately leaves `downloads` alone: whether finished downloads
  * survive is the user's choice, and `clearAllTables()` would orphan their files by dropping the rows.
