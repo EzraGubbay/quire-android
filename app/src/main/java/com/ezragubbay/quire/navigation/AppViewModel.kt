@@ -9,6 +9,7 @@ import com.ezragubbay.quire.core.network.ApiResult
 import com.ezragubbay.quire.core.network.QuireClient
 import com.ezragubbay.quire.core.network.SessionEvents
 import com.ezragubbay.quire.core.network.TokenCache
+import com.ezragubbay.quire.core.upload.UploadQueue
 import com.ezragubbay.quire.push.PushSession
 import com.ezragubbay.quire.push.PushTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,6 +38,7 @@ private const val PUSH_DELETE_TIMEOUT_MS = 2_000L
  * registration before revoking the token, and any end of session drops the local FCM token. A notification tap
  * ([openFromPush]) waits in [pendingPushTarget] until the signed-in shell consumes it (ADR 0003 §4.5).
  */
+@Suppress("LongParameterList") // one collaborator per session-lifecycle concern, all injected
 @HiltViewModel
 class AppViewModel
     @Inject
@@ -47,6 +49,7 @@ class AppViewModel
         private val client: QuireClient,
         private val push: PushSession,
         private val cleaner: AccountDataCleaner,
+        private val uploads: UploadQueue,
     ) : ViewModel() {
         private val _signedIn = MutableStateFlow<Boolean?>(null)
         val signedIn: StateFlow<Boolean?> = _signedIn.asStateFlow()
@@ -105,8 +108,9 @@ class AppViewModel
          * Deletes the push registration and revokes the device token (best effort, one timeout for both, in that
          * order), clears the session, drops the local FCM token, wipes local account data ([AccountDataCleaner]:
          * course cache, viewer cache and unfinished downloads always; finished downloads and pins only when
-         * [removeDownloads]) and routes to Pair without a message. A cleanup failure never blocks sign-out. A `401`
-         * expiry ([expire]) deliberately wipes nothing: the user did not choose to sign out and usually re-pairs.
+         * [removeDownloads]) and routes to Pair without a message. A cleanup failure never blocks sign-out. The
+         * upload queue is cleared too. A `401` expiry ([expire]) wipes nothing else (the user did not choose to sign
+         * out and usually re-pairs) but also drops the upload queue, which could not be sent without a session.
          */
         fun signOut(removeDownloads: Boolean = false): Job =
             viewModelScope.launch {
@@ -118,6 +122,7 @@ class AppViewModel
                         client.revokeToken()
                     }
                     sessions.signOut()
+                    clearUploads()
                     tokenCache.invalidate()
                     push.onSignedOut()
                     try {
@@ -163,9 +168,21 @@ class AppViewModel
             _sessionExpired.value = false
         }
 
+        /** Upload cleanup must never keep the user signed in: a failure here is swallowed. */
+        private suspend fun clearUploads() {
+            try {
+                uploads.clearAll()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Best effort: queued rows are also dropped with the app data on uninstall.
+            }
+        }
+
         private suspend fun expire() {
             if (signingOut || _signedIn.value != true) return
             sessions.signOut()
+            clearUploads()
             tokenCache.invalidate()
             // The server already deleted the registration with the token; only the local half remains.
             push.onSignedOut()

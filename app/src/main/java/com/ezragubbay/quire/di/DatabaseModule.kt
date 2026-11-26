@@ -16,6 +16,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /** Offline cache graph: the Room database, its DAOs and the repositories on top of it. */
+@Suppress("TooManyFunctions") // one @Provides per DAO
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -47,6 +48,9 @@ object DatabaseModule {
 
     @Provides
     fun readingPositionDao(db: QuireDatabase) = db.readingPositionDao()
+
+    @Provides
+    fun uploadDao(db: QuireDatabase) = db.uploadDao()
 
     @Provides
     fun browseApi(client: QuireClient): BrowseApi = client

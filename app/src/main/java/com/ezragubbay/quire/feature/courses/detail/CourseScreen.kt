@@ -1,5 +1,6 @@
 package com.ezragubbay.quire.feature.courses.detail
 
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,21 +30,27 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,10 +62,19 @@ import com.ezragubbay.quire.core.designsystem.component.LoadingSkeleton
 import com.ezragubbay.quire.core.designsystem.component.QuireTopBar
 import com.ezragubbay.quire.core.designsystem.theme.FileType
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
+import com.ezragubbay.quire.core.upload.UploadTab
 import com.ezragubbay.quire.feature.courses.files.FileSort
 import com.ezragubbay.quire.feature.courses.files.FilesTab
 import com.ezragubbay.quire.feature.downloads.UnpinDialog
+import com.ezragubbay.quire.feature.upload.UploadMessage
+import com.ezragubbay.quire.feature.upload.UploadTabFrame
+import com.ezragubbay.quire.feature.upload.rejectionRes
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+
+/** Space kept clear under the Files/Notes lists (and above snackbars) for the Upload button. */
+private val UPLOAD_FAB_CLEARANCE = 80.dp
 
 private val TABS =
     listOf(
@@ -92,6 +108,11 @@ fun CourseScreen(
         onAsk = onAsk,
         onPin = viewModel::pin,
         onUnpin = viewModel::unpin,
+        onPickUploads = viewModel::onPicked,
+        onRetryUpload = viewModel::retryUpload,
+        onCancelUpload = viewModel::cancelUpload,
+        onDismissUpload = viewModel::dismissUpload,
+        uploadMessages = viewModel.messages,
     )
 }
 
@@ -109,10 +130,29 @@ internal fun CourseContent(
     onAsk: () -> Unit = {},
     onPin: () -> Unit = {},
     onUnpin: (removeFiles: Boolean) -> Unit = {},
+    onPickUploads: (UploadTab, List<Uri>) -> Unit = { _, _ -> },
+    onRetryUpload: (String) -> Unit = {},
+    onCancelUpload: (String) -> Unit = {},
+    onDismissUpload: (String) -> Unit = {},
+    uploadMessages: Flow<UploadMessage> = emptyFlow(),
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val content = state as? CourseUiState.Content
+    val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    LaunchedEffect(uploadMessages) {
+        uploadMessages.collect { message ->
+            val text =
+                when (message) {
+                    is UploadMessage.Rejected -> context.getString(rejectionRes(message.reason), message.displayName)
+                    is UploadMessage.SavedToDocuments ->
+                        context.getString(R.string.upload_saved_to_documents, message.displayName)
+                }
+            snackbar.showSnackbar(text)
+        }
+    }
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = UPLOAD_FAB_CLEARANCE)) },
         modifier = Modifier.fillMaxSize().testTag("screen-course").nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             QuireTopBar(
@@ -148,11 +188,20 @@ internal fun CourseContent(
                         onOpenNote,
                         onPin,
                         onUnpin,
+                        UploadActions(onPickUploads, onRetryUpload, onCancelUpload, onDismissUpload),
                     )
             }
         }
     }
 }
+
+/** The upload callbacks the course tabs share. */
+private class UploadActions(
+    val onPicked: (UploadTab, List<Uri>) -> Unit,
+    val onRetry: (String) -> Unit,
+    val onCancel: (String) -> Unit,
+    val onDismiss: (String) -> Unit,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -165,6 +214,7 @@ private fun CourseTabs(
     onOpenNote: (String) -> Unit,
     onPin: () -> Unit,
     onUnpin: (removeFiles: Boolean) -> Unit,
+    uploads: UploadActions,
 ) {
     // rememberPagerState is saveable, so the selected tab survives rotation and process death.
     val pager = rememberPagerState { TABS.size }
@@ -197,8 +247,35 @@ private fun CourseTabs(
         HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
             when (page) {
                 0 -> SessionsTab(state, onSelectFilter, onOpenFile)
-                1 -> FilesTab(state.filesView, state.files.isEmpty(), onToggleFileType, onSelectFileSort, onOpenFile)
-                else -> NotesTab(state.notes, onOpenNote)
+                1 ->
+                    UploadTabFrame(
+                        UploadTab.FILES,
+                        state.fileUploads,
+                        state.preparingUpload,
+                        { uploads.onPicked(UploadTab.FILES, it) },
+                        uploads.onRetry,
+                        uploads.onCancel,
+                        uploads.onDismiss,
+                    ) {
+                        FilesTab(
+                            state.filesView,
+                            state.files.isEmpty(),
+                            onToggleFileType,
+                            onSelectFileSort,
+                            onOpenFile,
+                            bottomPadding = UPLOAD_FAB_CLEARANCE,
+                        )
+                    }
+                else ->
+                    UploadTabFrame(
+                        UploadTab.NOTES,
+                        state.noteUploads,
+                        state.preparingUpload,
+                        { uploads.onPicked(UploadTab.NOTES, it) },
+                        uploads.onRetry,
+                        uploads.onCancel,
+                        uploads.onDismiss,
+                    ) { NotesTab(state.notes, onOpenNote, UPLOAD_FAB_CLEARANCE) }
             }
         }
     }
@@ -313,6 +390,7 @@ private fun SessionItem(
 private fun NotesTab(
     notes: List<CourseNote>,
     onOpenNote: (String) -> Unit,
+    bottomPadding: Dp = 0.dp,
 ) {
     if (notes.isEmpty()) {
         EmptyState(stringResource(R.string.course_notes_empty), Modifier.testTag("note-list"))
@@ -321,7 +399,7 @@ private fun NotesTab(
     val spacing = QuireTheme.spacing
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("note-list"),
-        contentPadding = PaddingValues(vertical = spacing.sm),
+        contentPadding = PaddingValues(top = spacing.sm, bottom = spacing.sm + bottomPadding),
     ) {
         items(notes, key = { it.id }) { note ->
             Box(Modifier.testTag("note-row-${note.id}")) {
