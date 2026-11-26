@@ -81,14 +81,20 @@ class DownloadRepository(
 
     /** [removeAll] plus the whole downloads directory, so files that have no row (orphans) go too. */
     suspend fun purgeAll() {
-        removeAll()
-        withContext(Dispatchers.IO) { paths.root.deleteRecursively() }
+        try {
+            removeAll()
+        } finally {
+            withContext(Dispatchers.IO) { paths.root.deleteRecursively() }
+        }
     }
 
     /** Total bytes held by downloads (finished files plus partials). */
     suspend fun storageBytes(): Long = dao.storageBytes()
 
     fun observeStorageBytes(): Flow<Long> = dao.observeStorageBytes().distinctUntilChanged()
+
+    /** Bytes of finished downloads only. */
+    fun observeDoneBytes(): Flow<Long> = dao.observeDoneBytes().distinctUntilChanged()
 
     /** The finished file for offline open (#38), or null when it is not (or no longer) on disk. */
     suspend fun localFile(fileId: String): File? =

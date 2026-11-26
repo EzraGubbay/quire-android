@@ -4,6 +4,7 @@ import com.ezragubbay.quire.core.database.QuireDatabase
 import com.ezragubbay.quire.core.download.DownloadRepository
 import com.ezragubbay.quire.feature.viewer.ViewerCache
 import com.ezragubbay.quire.sync.OfflineSettingsStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -28,15 +29,31 @@ class LocalAccountDataCleaner(
     private val viewerCache: ViewerCache,
     private val offline: OfflineSettingsStore,
 ) : AccountDataCleaner {
-    override fun observeDownloadBytes(): Flow<Long> = downloads.observeStorageBytes()
+    override fun observeDownloadBytes(): Flow<Long> = downloads.observeDoneBytes()
 
     override suspend fun clear(removeDownloads: Boolean) {
-        downloads.removeUnfinished()
-        db.accountCacheDao().clearCourseCache()
-        withContext(Dispatchers.IO) { viewerCache.clear() }
+        // Each step runs even if an earlier one failed (a failed cache wipe must not leave the downloads behind
+        // when the user asked to remove them); the first failure is rethrown at the end.
+        val steps = mutableListOf<suspend () -> Unit>()
+        steps += { downloads.removeUnfinished() }
+        steps += { db.accountCacheDao().clearCourseCache() }
+        steps += { withContext(Dispatchers.IO) { viewerCache.clear() } }
         if (removeDownloads) {
-            downloads.purgeAll()
-            offline.clearPins()
+            steps += { downloads.purgeAll() }
+            steps += { offline.clearPins() }
         }
+        var first: Throwable? = null
+        for (step in steps) {
+            try {
+                step()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                if (first == null) first = e
+            }
+        }
+        first?.let { throw it }
     }
 }

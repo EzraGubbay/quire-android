@@ -220,9 +220,14 @@ private fun AccountSection(
             onRemoveDownloadsChange = { removeDownloads = it },
             onConfirm = {
                 confirming = false
-                onSignOut(removeDownloads)
+                val remove = removeDownloads
+                removeDownloads = false
+                onSignOut(remove)
             },
-            onDismiss = { confirming = false },
+            onDismiss = {
+                confirming = false
+                removeDownloads = false
+            },
         )
     }
     Column(modifier = Modifier.testTag(SETTINGS_ACCOUNT_TAG)) {

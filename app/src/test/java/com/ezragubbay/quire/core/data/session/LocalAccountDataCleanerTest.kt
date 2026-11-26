@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -156,4 +157,33 @@ class LocalAccountDataCleanerTest {
             cleaner.clear(removeDownloads = true)
             assertEquals(0, count("downloads"))
         }
+
+    @Test
+    fun clear_runsEveryStepEvenWhenOneFails_thenRethrows() {
+        seed()
+        // Cancelling work fails (first step); the cache wipe, viewer cache and removal steps must still run.
+        val throwing =
+            object : com.ezragubbay.quire.core.download.DownloadScheduler by scheduler {
+                override fun cancelAll() = error("boom")
+            }
+        val repo = DownloadRepository(db.downloadDao(), throwing, paths)
+        val failing = LocalAccountDataCleaner(db, repo, viewer, offline)
+
+        val thrown = runCatching { runBlocking { failing.clear(removeDownloads = true) } }.exceptionOrNull()
+
+        assertTrue(thrown is IllegalStateException)
+        courseCacheTables.forEach { assertEquals(it, 0, count(it)) }
+        assertFalse(viewer.root.exists())
+        assertFalse(paths.root.exists())
+        assertEquals(emptySet<String>(), runBlocking { offline.current() }.pinned)
+    }
+
+    @Test
+    fun observeDownloadBytes_countsOnlyFinishedDownloads() {
+        seed()
+
+        val bytes = runBlocking { cleaner.observeDownloadBytes().first() }
+
+        assertEquals(4L, bytes) // the DONE row only; the RUNNING row's 4 partial bytes do not count
+    }
 }

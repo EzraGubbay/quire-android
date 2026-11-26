@@ -617,6 +617,7 @@ class AppViewModelTest {
     fun downloadBytes_reflectsTheCleanersFlow() =
         runBlocking {
             val vm = vm()
+            vm.resolved()
             cleaner.bytes.value = 2048L
 
             assertEquals(2048L, vm.downloadBytes.first { it > 0L })
