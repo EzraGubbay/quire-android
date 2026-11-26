@@ -93,7 +93,7 @@ Open questions:
 | E2-S6 | [#22](https://github.com/EzraGubbay/quire-android/issues/22) | App identity: adaptive icon, themed (monochrome) icon, splash screen | XS | 2 | `needs-spec` | E2-S1 |
 
 Open questions:
-- E2-S6: Needs a vector logo: the web app only ships raster icons (`apps/web/public/icons/icon-512.png`). Human to supply an SVG / vector mark, or approve the agent redrawing one.
+- E2-S6: RESOLVED in [#167](https://github.com/EzraGubbay/quire-android/issues/167): the launcher, themed, splash and notification icons use the web mark (Georgia Bold "Q", cream on oxblood) as a vector outline, `drawable/ic_quire_logo.xml`.
 
 ## E3 — Auth: device pairing against the mobile API ([#4](https://github.com/EzraGubbay/quire-android/issues/4))
 
