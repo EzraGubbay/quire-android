@@ -70,7 +70,8 @@ const val PUSH_TARGET_MISSING_TAG = "push-target-missing"
 @Composable
 fun AppShell(
     account: SessionState.SignedIn? = null,
-    onSignOut: () -> Unit = {},
+    onSignOut: (removeDownloads: Boolean) -> Unit = {},
+    downloadBytes: Long = 0L,
     pushTarget: PushTarget? = null,
     pushTargetResolver: PushTargetResolver = PushTargetResolver.Unchecked,
     onPushTargetConsumed: (PushTarget) -> Unit = {},
@@ -193,6 +194,7 @@ fun AppShell(
                 SettingsScreen(
                     account = account,
                     onSignOut = onSignOut,
+                    downloadBytes = downloadBytes,
                     onBack = { navController.popBackStack() },
                 )
             }

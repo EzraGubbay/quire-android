@@ -37,6 +37,8 @@ abstract class QuireDatabase : RoomDatabase() {
 
     abstract fun threadDao(): ThreadDao
 
+    abstract fun accountCacheDao(): AccountCacheDao
+
     companion object {
         const val VERSION = 4
         const val NAME = "quire.db"
