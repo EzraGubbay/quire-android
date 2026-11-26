@@ -252,6 +252,16 @@
     <string name="settings_push_test_not_registered">This device isn\'t registered yet</string>
     <string name="settings_push_test_rate_limited">Try again in a moment</string>
     <string name="settings_push_test_unreachable">Couldn\'t reach your server</string>
+    <string name="downloads_channel_name">Downloads</string>
+    <plurals name="downloads_progress_title">
+        <item quantity="one">Downloading %d file</item>
+        <item quantity="other">Downloading %d files</item>
+    </plurals>
+    <string name="downloads_progress_text">%1$s of %2$s</string>
+    <plurals name="downloads_progress_queued">
+        <item quantity="one">%d queued</item>
+        <item quantity="other">%d queued</item>
+    </plurals>
     <string name="action_cancel">Cancel</string>
     <string name="sign_out_dialog_title">Sign out?</string>
     <string name="sign_out_dialog_body">You\'ll need to pair this device again.</string>
