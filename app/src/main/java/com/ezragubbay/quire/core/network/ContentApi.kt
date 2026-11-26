@@ -23,4 +23,17 @@ interface ContentApi {
         @Header("Range") range: String?,
         @Header("If-Range") ifRange: String?,
     ): Response<ResponseBody>
+
+    /**
+     * Conditional variant of [content] for revalidating a cached copy: a null [ifNoneMatch] is omitted (an
+     * unconditional GET). A `304` means "unchanged" and carries no body; a `200` carries the new bytes and `ETag`.
+     */
+    @Streaming
+    @GET("courses/{course}/files/{fileId}/content")
+    suspend fun contentIfNoneMatch(
+        @Path("course") courseSlug: String,
+        @Path("fileId") fileId: String,
+        @Query("format") format: String,
+        @Header("If-None-Match") ifNoneMatch: String?,
+    ): Response<ResponseBody>
 }
