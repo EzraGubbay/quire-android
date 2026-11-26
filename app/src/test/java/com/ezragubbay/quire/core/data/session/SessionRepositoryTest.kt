@@ -6,15 +6,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -23,29 +22,34 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
+/**
+ * DataStore and the repository's eager `state` collection run on the runTest scheduler (backgroundScope), never on a
+ * real dispatcher: every wait is deterministic and bounded by runTest's timeout, so a lost emission fails fast with a
+ * coroutine dump instead of hanging the JVM.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionRepositoryTest {
     @get:Rule
     val tmp = TemporaryFolder()
 
-    private val scope = CoroutineScope(Dispatchers.IO)
     private val cipher = FakeCipher()
     private val file: File by lazy { tmp.newFile("session.preferences_pb").also { it.delete() } }
 
-    @After
-    fun tearDown() = scope.cancel()
+    private fun sessionTest(body: suspend TestScope.() -> Unit) = runTest(timeout = TIMEOUT, testBody = body)
 
-    private fun store(storeScope: CoroutineScope = scope): DataStore<Preferences> =
-        PreferenceDataStoreFactory.create(scope = storeScope) { file }
+    private fun TestScope.store(scope: CoroutineScope = backgroundScope): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create(scope = scope) { file }
 
-    private fun repo(dataStore: DataStore<Preferences> = store()) = SessionRepository(dataStore, cipher, scope)
+    private fun TestScope.repo(dataStore: DataStore<Preferences> = store()) =
+        SessionRepository(dataStore, cipher, backgroundScope)
 
     private suspend fun SessionRepository.signInDefault() = signIn(SERVER, TOKEN, "ezra", "Pixel 9")
 
     @Test
     fun freshStore_isSignedOut_withNoToken() =
-        runBlocking {
+        sessionTest {
             val repo = repo()
             assertEquals(SessionState.SignedOut, repo.current())
             assertNull(repo.token())
@@ -53,7 +57,7 @@ class SessionRepositoryTest {
 
     @Test
     fun signIn_exposesSignedInState_andToken() =
-        runBlocking {
+        sessionTest {
             val repo = repo()
             repo.signInDefault()
             assertEquals(SessionState.SignedIn(SERVER, "ezra", "Pixel 9"), repo.current())
@@ -65,36 +69,27 @@ class SessionRepositoryTest {
         }
 
     @Test
-    fun tokenOrNull_isNullImmediately_whenSignedOut() {
-        val repo = repo()
-        assertNull(repo.tokenOrNull())
-    }
+    fun tokenOrNull_isNullImmediately_whenSignedOut() =
+        sessionTest {
+            assertNull(repo().tokenOrNull())
+        }
 
     @Test
-    fun tokenOrNull_isWarmAfterSignIn_andClearedOnSignOut() {
-        // cachedToken is written both directly by signIn/signOut and by the eager state collection; drive that
-        // collection on the test scheduler so advanceUntilIdle() settles it before each assertion (no wall-clock race).
-        val dispatcher = UnconfinedTestDispatcher()
-        val testScope = CoroutineScope(dispatcher)
-        try {
-            runTest(dispatcher) {
-                val repo = SessionRepository(store(testScope), cipher, testScope)
-                repo.signInDefault()
-                advanceUntilIdle()
-                assertEquals(TOKEN, repo.tokenOrNull())
+    fun tokenOrNull_isWarmAfterSignIn_andClearedOnSignOut() =
+        sessionTest {
+            val repo = repo()
+            repo.signInDefault()
+            advanceUntilIdle()
+            assertEquals(TOKEN, repo.tokenOrNull())
 
-                repo.signOut()
-                advanceUntilIdle()
-                assertNull(repo.tokenOrNull())
-            }
-        } finally {
-            testScope.cancel()
+            repo.signOut()
+            advanceUntilIdle()
+            assertNull(repo.tokenOrNull())
         }
-    }
 
     @Test
     fun tokenOrNull_isRestoredByEagerCollection_withoutBlockingRead() =
-        runBlocking {
+        sessionTest {
             val dataStore = store()
             repo(dataStore).signInDefault()
             val restored = repo(dataStore)
@@ -104,7 +99,7 @@ class SessionRepositoryTest {
 
     @Test
     fun signOut_clearsSessionAndToken() =
-        runBlocking {
+        sessionTest {
             val repo = repo()
             repo.signInDefault()
             repo.signOut()
@@ -115,22 +110,20 @@ class SessionRepositoryTest {
 
     @Test
     fun restore_survivesNewRepositoryOverSameFile() =
-        runBlocking {
+        sessionTest {
             // Simulate a process restart: the first DataStore must be closed before another opens the same file.
-            val firstScope = CoroutineScope(Dispatchers.IO)
-            val first =
-                SessionRepository(PreferenceDataStoreFactory.create(scope = firstScope) { file }, cipher, firstScope)
+            val firstScope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+            val first = SessionRepository(store(firstScope), cipher, firstScope)
             first.signInDefault()
-            firstScope.cancel()
-            firstScope.coroutineContext[kotlinx.coroutines.Job]?.join()
-            val restored = SessionRepository(store(), cipher, scope)
+            firstScope.coroutineContext[Job]!!.cancelAndJoin()
+            val restored = repo()
             assertEquals(SessionState.SignedIn(SERVER, "ezra", "Pixel 9"), restored.current())
             assertEquals(TOKEN, restored.token())
         }
 
     @Test
     fun signIn_overwritesPreviousSession() =
-        runBlocking {
+        sessionTest {
             val repo = repo()
             repo.signInDefault()
             repo.signIn("https://other.example", "tok-2", "someone", "Tablet")
@@ -140,7 +133,7 @@ class SessionRepositoryTest {
 
     @Test
     fun plainToken_isNeverWrittenToDisk() =
-        runBlocking {
+        sessionTest {
             val repo = repo()
             repo.signInDefault()
             repo.current()
@@ -151,9 +144,8 @@ class SessionRepositoryTest {
 
     @Test
     fun undecryptableStore_resolvesToSignedOut_andIsCleared() =
-        runBlocking {
-            val dataStore = store()
-            val repo = repo(dataStore)
+        sessionTest {
+            val repo = repo()
             repo.signInDefault()
             cipher.failDecrypt = true
             assertEquals(SessionState.SignedOut, repo.current())
@@ -164,7 +156,7 @@ class SessionRepositoryTest {
 
     @Test
     fun corruptedPayload_resolvesToSignedOut() =
-        runBlocking {
+        sessionTest {
             val dataStore = store()
             dataStore.edit { it[stringPreferencesKey("session_blob")] = "!!!not-base64!!!" }
             assertEquals(SessionState.SignedOut, repo(dataStore).current())
@@ -172,7 +164,7 @@ class SessionRepositoryTest {
 
     @Test
     fun decryptableButMalformedJson_resolvesToSignedOut() =
-        runBlocking {
+        sessionTest {
             val dataStore = store()
             val blob =
                 java.util.Base64
@@ -190,5 +182,6 @@ class SessionRepositoryTest {
     private companion object {
         const val SERVER = "https://quire.example.com"
         const val TOKEN = "tok-SECRET-1234567890"
+        val TIMEOUT = 30.seconds
     }
 }
