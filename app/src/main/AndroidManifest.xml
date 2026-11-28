@@ -15,6 +15,9 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:mimeType="*/*" />
         </intent>
+        <!-- Obtainium (stable and F-Droid flavours): the in-app update prompt opens it. -->
+        <package android:name="dev.imranr.obtainium" />
+        <package android:name="dev.imranr.obtainium.fdroid" />
     </queries>
 
     <application

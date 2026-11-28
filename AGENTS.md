@@ -33,7 +33,7 @@ TalkBack semantics. It is not a shrunk web UI — take the palette from the web 
   platform `PdfRenderer` (PDF). Tests: JUnit, Turbine, Robolectric, MockWebServer, Compose UI test, Roborazzi.
 - Package layout under `app/src/main/java/com/ezragubbay/quire/`:
   `core/designsystem`, `core/network`, `core/database`, `core/data`, `core/download`, `core/upload`,
-  `feature/<name>` (auth, courses, search, viewer, downloads, notes, chat, settings, upload), `navigation`, `sync`,
+  `feature/<name>` (auth, courses, search, viewer, downloads, notes, chat, settings, upload, update), `navigation`, `sync`,
   `push`, `di`.
 
 ## Commands
