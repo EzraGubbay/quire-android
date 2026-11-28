@@ -284,4 +284,9 @@
     <string name="sign_out_dialog_title">Sign out?</string>
     <string name="sign_out_dialog_body">You\'ll need to pair this device again.</string>
     <string name="sign_out_remove_downloads">Also remove downloaded files (%s)</string>
+    <string name="update_available_title">Quire v%1$s is available</string>
+    <string name="update_available_message">Open Obtainium to install it. If Update isn\'t showing yet, refresh Quire in Obtainium.</string>
+    <string name="update_open_obtainium">Open Obtainium</string>
+    <string name="update_view_release">View release</string>
+    <string name="update_later">Later</string>
 </resources>

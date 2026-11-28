@@ -54,3 +54,14 @@ the same signing certificate as every earlier release (optionally pin it with `E
 `versionCode` strictly greater than all earlier releases. The pure rules live in
 `buildSrc/.../buildlogic/ReleaseChecks.kt` and are unit-tested by `ReleaseChecksTest` in the `unit-tests` CI job.
 Run it after each release, e.g. `scripts/check-release.sh v1.0.0-rc1`.
+
+## In-app update prompt
+
+The app reads `GET /repos/EzraGubbay/quire-android/releases/latest` from GitHub without credentials, so the repository
+must stay public. When the latest release is newer than the installed version, a dialog offers to open Obtainium.
+
+- The tag must be `vX.Y.Z`. `-rcN` tags and GitHub prereleases or drafts never prompt.
+- The release must have its `.apk` attached; a release without one is ignored.
+- Devices check at most every 6 hours, on app open, so the prompt appears within about 6 hours of the next open.
+- **Later** snoozes that version only; a newer version prompts again.
+- After this feature ships, a release no longer needs a separate FCM announcement to reach installed devices.

@@ -36,6 +36,7 @@ phone: never commit it, put it in a file in this repo, or share it.
 
 **Updates.** Obtainium checks for new releases periodically; open it, tap the Quire entry and choose **Update**.
 Android only accepts an update signed with the same key as the installed app, so the certificate never changes.
+The app also checks GitHub Releases at most every 6 hours and, when a newer version is out, offers to open Obtainium on Quire's page (Obtainium 1.7.5+; older versions open Obtainium's home screen).
 
 **Verify the certificate fingerprint.** Compare the SHA-256 of the APK's signing certificate with the one you recorded
 when the key was generated (`keytool -list -v -keystore quire-release.jks`):
