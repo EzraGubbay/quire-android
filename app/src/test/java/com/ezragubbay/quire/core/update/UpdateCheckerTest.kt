@@ -5,7 +5,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -157,6 +159,20 @@ class UpdateCheckerTest {
         assertNull(checker.prompt())
     }
 
+    @Test
+    fun subscribingWhileTheWriteIsInFlight_stillReceivesTheNewVersion() {
+        repeat(RACE_ROUNDS) { round ->
+            val source = FakeSource(found())
+            val racing = checker(source, store = fresh())
+            runBlocking {
+                val check = launch(Dispatchers.IO) { racing.checkIfDue() }
+                val seen = withTimeout(RACE_TIMEOUT_MS) { racing.prompt.first { it != null } }
+                check.join()
+                assertEquals("round $round", "1.2.0", seen?.version)
+            }
+        }
+    }
+
     private fun fresh(): UpdateStore =
         UpdateStore(
             PreferenceDataStoreFactory.create(scope = scope) {
@@ -166,6 +182,8 @@ class UpdateCheckerTest {
 
     private companion object {
         const val START = 1_000_000_000L
+        const val RACE_ROUNDS = 40
+        const val RACE_TIMEOUT_MS = 5_000L
         const val MINUTE = 60_000L
         const val HOUR = 60 * MINUTE
         const val URL = "https://github.com/EzraGubbay/quire-android/releases/tag"

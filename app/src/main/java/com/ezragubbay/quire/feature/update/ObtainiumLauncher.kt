@@ -64,5 +64,5 @@ object ObtainiumLauncher {
         Intent(Intent.ACTION_SHOW_APP_INFO)
             .setPackage(pkg)
             .putExtra(Intent.EXTRA_PACKAGE_NAME, selfPackage)
-            .takeIf { pm.resolveActivity(it, 0) != null }
+            .takeIf { pm.resolveActivity(it, PackageManager.MATCH_DEFAULT_ONLY) != null }
 }

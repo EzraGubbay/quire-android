@@ -9,7 +9,7 @@ import android.content.pm.PackageInfo
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -80,8 +80,10 @@ class ObtainiumLauncherTest {
 
     @Test
     fun open_neverThrows_whenNothingCanHandleIt() {
+        // Make startActivity throw ActivityNotFoundException for the Obtainium and the browser attempt alike.
+        shadowOf(app).checkActivities(true)
         ObtainiumLauncher.open(app, RELEASE)
-        assertNotNull(shadowOf(app).nextStartedActivity)
+        assertNull(shadowOf(app).nextStartedActivity)
     }
 
     private companion object {

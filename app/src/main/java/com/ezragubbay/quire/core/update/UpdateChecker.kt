@@ -1,10 +1,14 @@
 package com.ezragubbay.quire.core.update
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import java.io.IOException
 
 /** A newer release the user has not snoozed. [version] is bare (`1.2.0`, no `v`). */
@@ -23,8 +27,15 @@ class UpdateChecker(
     private val currentVersion: String,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
+    /**
+     * Bumped after every write. A DataStore collector that starts while an `edit` is in flight can miss that edit,
+     * so each bump restarts the read and the prompt never depends on catching the write through the flow.
+     */
+    private val refresh = MutableStateFlow(0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val prompt: Flow<UpdatePrompt?> =
-        store.state.map(::promptFor).distinctUntilChanged()
+        refresh.flatMapLatest { store.state }.map(::promptFor).distinctUntilChanged()
 
     /** Fetches if the window has elapsed. Never throws (except cancellation). */
     suspend fun checkIfDue() {
@@ -38,6 +49,7 @@ class UpdateChecker(
                     // Offline: record nothing so the next resume retries as soon as the network is back.
                     FetchResult.NetworkError -> Unit
                 }
+                refresh.update { it + 1 }
             }
         } catch (e: CancellationException) {
             throw e
@@ -51,6 +63,7 @@ class UpdateChecker(
     suspend fun snooze(version: String) {
         try {
             store.snooze(version)
+            refresh.update { it + 1 }
         } catch (
             @Suppress("SwallowedException") _: IOException,
         ) {

@@ -11,6 +11,7 @@ import com.ezragubbay.quire.core.update.UpdateStore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
@@ -20,7 +21,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -54,10 +54,12 @@ class UpdateViewModelTest {
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
 
     private val created = mutableListOf<UpdateViewModel>()
+    private val watchers = mutableListOf<Job>()
 
     @After
     fun tearDown() {
         // Stop the view models' own scopes before Main is reset, or their collectors resume on a missing Main.
+        watchers.forEach { it.cancel() }
         runBlocking {
             created.forEach {
                 it.viewModelScope.coroutineContext.job
@@ -72,33 +74,14 @@ class UpdateViewModelTest {
 
     private fun checker(source: FakeSource) = UpdateChecker(source, UpdateStore(dataStore), "1.1.3")
 
-    /** Keeps the prompt subscribed (it is WhileSubscribed) and polls until it is present or absent. */
-    private fun UpdateViewModel.await(present: Boolean): UpdatePrompt? {
-        val keepAlive = scope.launch { prompt.collect {} }
-        try {
-            val deadline = System.currentTimeMillis() + TIMEOUT_MS
-            while ((prompt.value != null) != present) {
-                check(System.currentTimeMillis() < deadline) { "prompt never became present=$present" }
-                Thread.sleep(POLL_MS)
-            }
-            return prompt.value
-        } finally {
-            keepAlive.cancel()
-        }
+    /** Subscribes like the UI does: before the check starts, and for as long as the test runs. */
+    private fun UpdateViewModel.watch() {
+        watchers += scope.launch { prompt.collect {} }
     }
 
-    @Test
-    fun twoResumesWhileFetching_fetchOnce() {
-        val gate = CompletableDeferred<FetchResult>()
-        val source = FakeSource { gate.await() }
-        val vm = vm(source)
-        vm.onResume()
-        waitUntil { source.calls == 1 }
-        vm.onResume()
-        Thread.sleep(SETTLE_MS)
-        gate.complete(FetchResult.NoRelease)
-        Thread.sleep(SETTLE_MS)
-        assertEquals(1, source.calls)
+    private fun UpdateViewModel.await(present: Boolean): UpdatePrompt? {
+        waitUntil { (prompt.value != null) == present }
+        return prompt.value
     }
 
     private fun waitUntil(condition: () -> Boolean) {
@@ -109,48 +92,89 @@ class UpdateViewModelTest {
         }
     }
 
+    /** A source that answers [release] only once the test lets it, i.e. after the UI has subscribed. */
+    private fun gatedSource(gate: CompletableDeferred<Unit>) =
+        FakeSource {
+            gate.await()
+            release
+        }
+
+    @Test
+    fun twoResumesWhileFetching_fetchOnce() {
+        val gate = CompletableDeferred<Unit>()
+        val source = gatedSource(gate)
+        val vm = vm(source)
+        vm.watch()
+        vm.onResume()
+        waitUntil { source.calls == 1 }
+        vm.onResume()
+        gate.complete(Unit)
+        assertEquals("1.2.0", vm.await(present = true)?.version)
+        assertEquals(1, source.calls)
+    }
+
     @Test
     fun newerRelease_isEmitted() {
-        val vm = vm(FakeSource { release })
+        val gate = CompletableDeferred<Unit>()
+        val vm = vm(gatedSource(gate))
+        vm.watch()
         vm.onResume()
+        gate.complete(Unit)
         assertEquals(UpdatePrompt("1.2.0", "$PAGE/v1.2.0"), vm.await(present = true))
     }
 
     @Test
     fun later_hidesNow_andPersistsAcrossAFreshViewModel() {
-        val source = FakeSource { release }
+        val gate = CompletableDeferred<Unit>()
+        val source = gatedSource(gate)
         val vm = vm(source)
+        vm.watch()
         vm.onResume()
-        val shown = checkNotNull(vm.await(present = true))
-        vm.onLater(shown)
+        gate.complete(Unit)
+        vm.onLater(checkNotNull(vm.await(present = true)))
         vm.await(present = false)
-        runBlocking { withTimeout(TIMEOUT_MS) { checker(source).prompt.first { it == null } } }
-        assertNull(vm(source).prompt.value)
+        waitUntil { runBlocking { checker(source).prompt.first() } == null }
+        val fresh = vm(source)
+        fresh.watch()
+        // The cached release is there (no fetch happened), yet the snooze keeps it hidden.
+        waitUntil { runBlocking { UpdateStore(dataStore).state.first().latestTag } != null }
+        assertNull(fresh.prompt.value)
     }
 
     @Test
     fun dismissed_hidesNow_butAFreshViewModelShowsItAgain() {
-        val source = FakeSource { release }
+        val gate = CompletableDeferred<Unit>()
+        val source = gatedSource(gate)
         val vm = vm(source)
+        vm.watch()
         vm.onResume()
-        val shown = checkNotNull(vm.await(present = true))
-        vm.onDismissed(shown)
+        gate.complete(Unit)
+        vm.onDismissed(checkNotNull(vm.await(present = true)))
         vm.await(present = false)
-        assertEquals("1.2.0", vm(source).await(present = true)?.version)
+        val fresh = vm(source)
+        fresh.watch()
+        assertEquals("1.2.0", fresh.await(present = true)?.version)
     }
 
     @Test
     fun opened_hidesForThisSession() {
-        val vm = vm(FakeSource { release })
+        val gate = CompletableDeferred<Unit>()
+        val vm = vm(gatedSource(gate))
+        vm.watch()
         vm.onResume()
+        gate.complete(Unit)
         vm.onOpened(checkNotNull(vm.await(present = true)))
         vm.await(present = false)
     }
 
     @Test
     fun throwingSource_neverCrashesAndNeverPrompts() {
-        val vm = vm(FakeSource { error("boom") })
+        val source = FakeSource { error("boom") }
+        val vm = vm(source)
+        vm.watch()
         vm.onResume()
+        waitUntil { source.calls == 1 }
+        Thread.sleep(SETTLE_MS)
         assertNull(vm.prompt.value)
     }
 
