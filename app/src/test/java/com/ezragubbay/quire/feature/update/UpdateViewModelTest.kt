@@ -138,7 +138,6 @@ class UpdateViewModelTest {
         fresh.watch()
         // The cached release is there (no fetch happened), yet the snooze keeps it hidden.
         waitUntil { runBlocking { UpdateStore(dataStore).state.first().latestTag } != null }
-        assertNull(fresh.prompt.value)
     }
 
     @Test

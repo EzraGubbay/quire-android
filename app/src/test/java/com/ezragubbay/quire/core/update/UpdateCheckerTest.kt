@@ -7,6 +7,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -160,13 +161,16 @@ class UpdateCheckerTest {
     }
 
     @Test
-    fun subscribingWhileTheWriteIsInFlight_stillReceivesTheNewVersion() {
+    fun subscribingAfterTheCheckStarted_stillReceivesTheNewVersion() {
         repeat(RACE_ROUNDS) { round ->
-            val source = FakeSource(found())
-            val racing = checker(source, store = fresh())
+            val racing = checker(FakeSource(found()), store = fresh())
             runBlocking {
-                val check = launch(Dispatchers.IO) { racing.checkIfDue() }
-                val seen = withTimeout(RACE_TIMEOUT_MS) { racing.prompt.first { it != null } }
+                // The check starts first (as onResume does) and parks on the store; only then does the UI subscribe.
+                val check = launch(Dispatchers.Unconfined) { racing.checkIfDue() }
+                val seen =
+                    withContext(Dispatchers.IO) {
+                        withTimeout(RACE_TIMEOUT_MS) { racing.prompt.first { it != null } }
+                    }
                 check.join()
                 assertEquals("round $round", "1.2.0", seen?.version)
             }
@@ -182,7 +186,7 @@ class UpdateCheckerTest {
 
     private companion object {
         const val START = 1_000_000_000L
-        const val RACE_ROUNDS = 40
+        const val RACE_ROUNDS = 150
         const val RACE_TIMEOUT_MS = 5_000L
         const val MINUTE = 60_000L
         const val HOUR = 60 * MINUTE
