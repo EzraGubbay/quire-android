@@ -12,6 +12,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ezragubbay.quire.core.designsystem.theme.QuireTheme
 import com.ezragubbay.quire.feature.auth.PairViewModel
 import com.ezragubbay.quire.feature.settings.SettingsViewModel
+import com.ezragubbay.quire.feature.update.UpdatePromptHost
+import com.ezragubbay.quire.feature.update.UpdateViewModel
 import com.ezragubbay.quire.navigation.AppViewModel
 import com.ezragubbay.quire.navigation.QuireApp
 import com.ezragubbay.quire.push.PushSession
@@ -34,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
     private val appViewModel: AppViewModel by viewModels()
     private val pairViewModel: PairViewModel by viewModels()
+    private val updateViewModel: UpdateViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -53,6 +56,9 @@ class MainActivity : ComponentActivity() {
             val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
             QuireTheme(themeMode = settings.themeMode, dynamicColor = settings.useDeviceColors) {
                 QuireApp(appViewModel, pairViewModel, pushTargetResolver)
+                // Its own dialog window; only while signed in, never over Pair or Scan.
+                val signedIn by appViewModel.signedIn.collectAsStateWithLifecycle()
+                UpdatePromptHost(updateViewModel, visible = signedIn == true)
             }
         }
     }
@@ -68,5 +74,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Notifications may have been allowed or turned off in system settings while away: re-register if so.
         pushSession.onResume()
+        // Look for a newer release (throttled to once per 6 h inside the checker).
+        updateViewModel.onResume()
     }
 }
